@@ -194,6 +194,13 @@ jobs:
             printf '%s\n' "$files" | grep -qE '^(docker|test|tools)/|^\.github/workflows/publish-images\.yml$' || images=false
           fi
           echo "images=$images" >> "$GITHUB_OUTPUT"
+      # Every pull request, whatever it changes (swarm-routing/.github#635): a
+      # shellcheck finding in the image's or the tests' scripts fails `images
+      # gate` through `resolve`, so it is fixed before the change merges.
+      - name: shellcheck (every tracked shell script)
+        run: |
+          mapfile -t scripts < <(git ls-files '*.sh')
+          shellcheck "${scripts[@]}"
       - name: Test the matrix generator and the unit shards
         if: steps.changes.outputs.images == 'true'
         run: |

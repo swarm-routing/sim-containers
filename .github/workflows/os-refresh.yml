@@ -103,7 +103,7 @@ jobs:
           done < "$RUNNER_TEMP/tags.txt"
           ls reports/*.json > /dev/null 2>&1 || { echo "::error::no image could be scanned"; exit 1; }
       - name: Pull the ci-tools image (with retries)
-        uses: swarm-routing/.github/.github/actions/pull-ci-tools@7726eae582ef488170ba81f96b1aeb2819ebc029 # main@2026-11-22
+        uses: swarm-routing/.github/.github/actions/pull-ci-tools@786502bd1a15a9b179678a09393e3b7592242b88 # main@2026-11-22
         timeout-minutes: 3   # a pull of about 15 MB and up to 90 s of retries
         with:
           image: ${{ env.CI_TOOLS }}
@@ -111,7 +111,7 @@ jobs:
         id: bot
         continue-on-error: true
         timeout-minutes: 2
-        uses: swarm-routing/.github/.github/actions/bot-token@7726eae582ef488170ba81f96b1aeb2819ebc029 # main@2026-11-22
+        uses: swarm-routing/.github/.github/actions/bot-token@786502bd1a15a9b179678a09393e3b7592242b88 # main@2026-11-22
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}

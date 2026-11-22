@@ -8,7 +8,7 @@ bestpractices_project = "16818"
 # the Zenodo concept record, read from Zenodo by swarm-routing/.github tools/zenodo/zenodo.py record (#232)
 zenodo_concept = "24202109"
 forms = true
-title = "ns3-containers"
+title = "sim-containers"
 dual = ["docker/", "test/smoke.sh", "test/run.sh", "test/structure.sh", "test/integration.sh", "test/profile.sh", "test/unit.sh", "test/downstream.sh", "tools/", ".github/workflows/"]
 ci_workflow = "publish-images.yml"
 posture = "the org's ns-3 development images (`ghcr.io/swarm-routing/ns3-dev`), used by every repository's CI"
@@ -47,6 +47,11 @@ python3 -m unittest discover -s tools
 $(MAKE) build
 test/run.sh local/$(notdir $(CURDIR)):dev"""
 
+
+[docs]
+# the project page keeps its id on the site until the site follows the rename
+# (swarm-routing/swarm-routing.github.io#234; swarm-routing/.github#672)
+arena_id = "ns3-containers"
 [settings]
 # GitHub settings as code: swarm-routing/.github tools/repo-settings (swarm-routing/.github#117).
 description = "Pre-built, tested ns-3 images for contrib-module CI: ghcr.io/swarm-routing/ns3-dev with the ns-3 tree configured and built: debug, sanitized, default and optimized profiles on Ubuntu, debug and default on Debian, debug on Alpine; signed and attested."

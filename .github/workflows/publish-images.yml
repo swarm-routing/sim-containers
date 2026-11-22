@@ -354,7 +354,7 @@ jobs:
           echo "candidate \`${CANDIDATE}@${DIGEST}\` ($NAME)" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the digest
         if: env.WRITE_REGISTRY == 'true'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digest-${{ matrix.name }}
           path: |
@@ -550,7 +550,7 @@ jobs:
       # artifact holds passed-<name>--<part>/digest (a directory path is the
       # artifact's root), so a merge-multiple download lays every marker out
       # the same way whether one artifact matches or several (#101).
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: passed-${{ matrix.name }}--${{ matrix.part }}
           path: pass

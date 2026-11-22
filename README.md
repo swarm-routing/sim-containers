@@ -28,6 +28,10 @@ it alone. Follow it with the `latest-*` tags. An OS security refresh is the
 supported release only, with its OS-package layer rerun (`REFRESH=<run id>`)
 so the distribution's fixes since the base digest are installed, then tests
 and promotes it like any build (the rolling tags move; the `-<sha7>` pins stay).
+It starts by itself: the daily *OS refresh* workflow (`os-refresh.yml`, #218)
+scans the `latest-*` images with Trivy and dispatches the refresh when an OS
+package has a fixable vulnerability of MEDIUM or higher, at most once a day; a
+failed refresh opens an issue here.
 
 | Release | Base | Profiles |
 |---|---|---|

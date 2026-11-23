@@ -28,6 +28,10 @@ it alone. Follow it with the `latest-*` tags. An OS security refresh is the
 supported release only, with its OS-package layer rerun (`REFRESH=<run id>`)
 so the distribution's fixes since the base digest are installed, then tests
 and promotes it like any build (the rolling tags move; the `-<sha7>` pins stay).
+It starts by itself: the daily *OS refresh* workflow (`os-refresh.yml`, #218)
+scans the `latest-*` images with Trivy and dispatches the refresh when an OS
+package has a fixable vulnerability of MEDIUM or higher, at most once a day; a
+failed refresh opens an issue here.
 
 | Release | Base | Profiles |
 |---|---|---|
@@ -392,7 +396,7 @@ What is planned and in progress here: the issues labelled [`epic`](https://githu
 | [#11](https://github.com/swarm-routing/sim-containers/issues/11) multi-platform ns3-dev images (linux/amd64 + linux/arm64) with docker buildx | Planned | 0 / 1 |
 | [#12](https://github.com/swarm-routing/sim-containers/issues/12) developer documentation for the ns3-dev images (usage, per-image pages, debugging, CI/CD) kept current by AI review | Planned | 0 / 7 |
 | [#27](https://github.com/swarm-routing/sim-containers/issues/27) security refresh — keep the supported ns-3 release's images patched (scheduled base refresh + scan-triggered rebuilds; older releases on demand) | Planned | 0 / 4 |
-| [#210](https://github.com/swarm-routing/sim-containers/issues/210) Post-rename stabilization, path-filtered layout (ns3/ + emane/), and canary trim | Planned | no sub-issues yet |
+| [#210](https://github.com/swarm-routing/sim-containers/issues/210) Post-rename stabilization, path-filtered layout (ns3/ + emane/), and canary trim | Planned | 0 / 3 |
 
 <details><summary>Closed: 1 epic</summary>
 

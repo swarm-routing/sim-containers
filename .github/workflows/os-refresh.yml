@@ -47,7 +47,7 @@ env:
   # Same pin as test/run.sh's security stage and publish-images.yml.
   TRIVY: ghcr.io/aquasecurity/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
   # swarm-routing/.github's ci-tools image, promoted from fe683ae (swarm-routing/.github#712, cmd/os-refresh)
-  CI_TOOLS: ghcr.io/swarm-routing/ci-tools@sha256:2a6861ebe0e28c25fae6a71283520e4ea576f571f291fe1e4ec2d900ba2c2483
+  CI_TOOLS: ghcr.io/swarm-routing/ci-tools@sha256:5d999adf7dbb47e52e725c0549cbc54c53354ed24289e758a9311dde986a4a4e
 
 jobs:
   scan:
@@ -103,7 +103,7 @@ jobs:
           done < "$RUNNER_TEMP/tags.txt"
           ls reports/*.json > /dev/null 2>&1 || { echo "::error::no image could be scanned"; exit 1; }
       - name: Pull the ci-tools image (with retries)
-        uses: swarm-routing/.github/.github/actions/pull-ci-tools@main
+        uses: swarm-routing/.github/.github/actions/pull-ci-tools@7e38e1fe7edf55c8894901b84f66d8eecc208ca1 # main@2026-11-23
         timeout-minutes: 3   # a pull of about 15 MB and up to 90 s of retries
         with:
           image: ${{ env.CI_TOOLS }}
@@ -111,7 +111,7 @@ jobs:
         id: bot
         continue-on-error: true
         timeout-minutes: 2
-        uses: swarm-routing/.github/.github/actions/bot-token@main
+        uses: swarm-routing/.github/.github/actions/bot-token@7e38e1fe7edf55c8894901b84f66d8eecc208ca1 # main@2026-11-23
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}

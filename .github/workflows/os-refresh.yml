@@ -47,7 +47,7 @@ env:
   # Same pin as test/run.sh's security stage and publish-images.yml.
   TRIVY: ghcr.io/aquasecurity/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
   # swarm-routing/.github's ci-tools image, promoted from fe683ae (swarm-routing/.github#712, cmd/os-refresh)
-  CI_TOOLS: ghcr.io/swarm-routing/ci-tools@sha256:2a6861ebe0e28c25fae6a71283520e4ea576f571f291fe1e4ec2d900ba2c2483
+  CI_TOOLS: ghcr.io/swarm-routing/ci-tools@sha256:69ed34afec4dc24a3f1fb6ef54382182afcb8ae505f4ef6c81796203d3c3ccd8
 
 jobs:
   scan:

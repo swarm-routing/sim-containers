@@ -113,7 +113,9 @@ run() {
     fi
     xf=$(expected "$name")
     if [ -n "$xf" ]; then
-        if [ "${xf%% *}" = "$outcome" ]; then
+        # an outcome of several words is one field there, hyphenated
+        # (no-packets-delivered, exit-139)
+        if [ "${xf%% *}" = "${outcome// /-}" ]; then
             echo "  XFAIL $name: $outcome after ${took} s, expected on ns-$NS3_VERSION: $xf"
             return
         fi

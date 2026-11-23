@@ -60,11 +60,16 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Acquire::Retries=0: the base's own apt does the download that installs the
 # fix, and CVE-2026-109518 (apt, hard-link reuse) needs a non-zero retry count
 # to be exploited over HTTP (Ubuntu's advisory; the default is 3 since Ubuntu
-# 22.04 / Debian 12). So the update fails hard on any fetch error
-# (--error-on=any; without it a failed index is only a warning and the install
-# fails minutes later with "has no installation candidate") and only the update
-# is retried, by the shell: 3 attempts, 10 s then 20 s apart. apk refetches its
-# index inside each --no-cache command, so it has no update step to retry.
+# 22.04 / Debian 12). So apt itself never retries, the update fails hard on
+# any fetch error (--error-on=any; without it a failed index is only a warning
+# and the install fails minutes later with "has no installation candidate"),
+# and the shell retries the update, the upgrade and the install together: 3
+# attempts, 10 s then 20 s apart. A package download fails on a mirror reset
+# as an index fetch does (the 2026-11-22 OS refresh lost its debian-debug
+# image to one, #218), and apt fetches every archive before it unpacks any,
+# so a failed attempt installs nothing and the next one starts over (an
+# upgrade that already went through is a no-op). apk refetches its index
+# inside each --no-cache command, so it has no fetch to retry.
 ARG REFRESH=none
 # ${venv} and ${sonar} are unquoted on purpose: empty, they make no word.
 # hadolint ignore=SC2086
@@ -73,13 +78,14 @@ RUN echo "package refresh: ${REFRESH}" \
  && case "${BUILD_PROFILE}" in debug) sonar="unzip curl gnupg" ;; *) sonar="" ;; esac \
  && if command -v apt-get >/dev/null; then \
         for delay in 10 20 0; do \
-            apt-get -o Acquire::Retries=0 update --error-on=any && break; \
+            apt-get -o Acquire::Retries=0 update --error-on=any \
+             && apt-get -o Acquire::Retries=0 upgrade -y --no-install-recommends \
+             && apt-get -o Acquire::Retries=0 install -y --no-install-recommends \
+                    ca-certificates git g++ cmake ninja-build python3 ${venv} ${sonar} make \
+             && break; \
             [ "${delay}" -gt 0 ] || exit 1; \
-            echo "apt-get update failed; retrying in ${delay} s" >&2; sleep "${delay}"; \
+            echo "apt fetch or install failed; retrying in ${delay} s" >&2; sleep "${delay}"; \
         done \
-     && apt-get -o Acquire::Retries=0 upgrade -y --no-install-recommends \
-     && apt-get -o Acquire::Retries=0 install -y --no-install-recommends \
-            ca-certificates git g++ cmake ninja-build python3 ${venv} ${sonar} make \
      && rm -rf /var/lib/apt/lists/*; \
     elif command -v apk >/dev/null; then \
         apk upgrade --no-cache \

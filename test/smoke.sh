@@ -111,9 +111,11 @@ int SwarmHelloCallsOld() { return SwarmHelloOld(); }
 CXX
 ns3-build-contrib --strict-warnings --test "$dep_call" > "$log" 2>&1 || {
     cat "$log"; echo "FAIL: --strict-warnings made a deprecated call an error" >&2; exit 1; }
-# Strip colour codes first: GCC on Alpine colours the option name.
+# Strip colour codes first: GCC on Alpine colours the option name. No pipe
+# into grep -q: it exits at the first match, sed then dies of SIGPIPE, and
+# pipefail fails the check although the warning is there.
 esc=$(printf '\033')
-sed "s/${esc}\[[0-9;]*[mK]//g" "$log" | grep -q -- '\[-Wdeprecated-declarations\]' || {
+grep -q -- '\[-Wdeprecated-declarations\]' <<<"$(sed "s/${esc}\[[0-9;]*[mK]//g" "$log")" || {
     cat "$log"; echo "FAIL: the deprecated call built without its warning" >&2; exit 1; }
 steps=$(steps_of "$log")
 if [ "${steps:-0}" -gt "$MAX_STEPS" ]; then

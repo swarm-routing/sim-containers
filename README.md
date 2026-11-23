@@ -277,8 +277,11 @@ expected on one exact ns-3 version; each shows in the step summary as XFAIL,
 and an expected failure that passes fails the stage. An entry stays while its
 release can still be built on demand, so an older release's `versions` build
 passes on its known bugs. Today:
-**ns-3.49's stock AODV hangs in the sparse run** (#35), and on 3.48 four wifi
-unit suites fail with the images' module set (#49).
+**ns-3.49's stock AODV hangs in the sparse run** (#35); on 3.48 four wifi
+unit suites fail with the images' module set (#49, a 3.48 test bug fixed in
+3.49); on 3.41 and 3.42, 802.11b frames at 5.5 and 11 Mb/s are dropped
+([nsnam/ns-3-dev#1095](https://gitlab.com/nsnam/ns-3-dev/-/work_items/1095),
+fixed in 3.43), so their 11 Mb/s integration runs deliver nothing (#44).
 
 More stages are coming (#36): fixed-seed regression.
 

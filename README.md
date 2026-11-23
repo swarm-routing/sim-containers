@@ -274,8 +274,11 @@ was tested.
 
 [`test/known-failures.txt`](test/known-failures.txt) lists upstream ns-3 bugs
 expected on one exact ns-3 version; each shows in the step summary as XFAIL,
-and an expected failure that passes fails the stage. Today:
-**ns-3.49's stock AODV hangs in the sparse run** (#35).
+and an expected failure that passes fails the stage. An entry stays while its
+release can still be built on demand, so an older release's `versions` build
+passes on its known bugs. Today:
+**ns-3.49's stock AODV hangs in the sparse run** (#35), and on 3.48 four wifi
+unit suites fail with the images' module set (#49).
 
 More stages are coming (#36): fixed-seed regression.
 

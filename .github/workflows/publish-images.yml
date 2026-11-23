@@ -169,7 +169,7 @@ jobs:
       canary_count: ${{ steps.m.outputs.canary_count }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -311,7 +311,7 @@ jobs:
       matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -429,7 +429,7 @@ jobs:
       count: ${{ steps.s.outputs.count }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -496,7 +496,7 @@ jobs:
       matrix: ${{ fromJSON(needs.select.outputs.tests) }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -584,7 +584,7 @@ jobs:
       matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -759,7 +759,7 @@ jobs:
       matrix: ${{ fromJSON(needs.resolve.outputs.canary) }}
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -852,7 +852,7 @@ jobs:
       packages: write
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -917,7 +917,7 @@ jobs:
       packages: write
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit
@@ -980,7 +980,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Harden the runner (audit egress)
-        uses: step-security/harden-runner@1d88384fd173af6ecb012dfd0264a306b711241a # v2.22.4
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
         timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
         with:
           egress-policy: audit

@@ -620,7 +620,7 @@ jobs:
       # failed or stalled download then publishes nothing, instead of leaving
       # tags without a signature (#148).
       - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
         timeout-minutes: 2  # 0-1 s in the 36 promote jobs of four green main runs (2026-11-11)
       # The image's inventory (#38), generated from the tested candidate digest
       # before any tag is created, so a failure here publishes nothing. ns-3

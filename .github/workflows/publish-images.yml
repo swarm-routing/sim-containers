@@ -199,7 +199,7 @@ jobs:
       # gate` through `resolve`, so it is fixed before the change merges.
       - name: shellcheck (every tracked shell script)
         run: |
-          mapfile -t scripts < <(git ls-files '*.sh')
+          mapfile -d '' -t scripts < <(git ls-files -z '*.sh')
           shellcheck "${scripts[@]}"
       - name: Test the matrix generator and the unit shards
         if: steps.changes.outputs.images == 'true'

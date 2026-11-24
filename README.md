@@ -173,7 +173,7 @@ passes its matrix entry and commit):
 
 | Stage | Checks |
 |---|---|
-| `labels` | the OCI labels: source, licence, ns-3 version, profile, base, revision |
+| `labels` | the OCI labels: source, url, documentation, vendor, licence, ns-3 version, profile, base, title and description (both naming the ns-3 version, profile and base, e.g. `ns3-dev 3.49 debug (ubuntu)`), revision, build run; for a candidate addressed by digest, the index annotations too (title, description, source, url, documentation, vendor, version, licence: equal to the labels), which the registry's package page shows and promote copies unchanged |
 | `structure` | `/opt/ns-3` configured and built, `ns3-build-contrib` on `PATH`, the environment, the recorded configure line and module list (equal to the Dockerfile's, every module built), the CMake cache matching the profile (build type, asserts, logs, sanitizers, no native optimizations, examples and tests on), the C++ standard the tree requires, `gcovr` at its pinned version on `debug` and `sanitized`, `unzip`, `curl` and `gpg` on `debug` |
 | `profile` | the profile does what its name says: asserts abort and `NS_LOG` prints (`default`, `debug`, `sanitized`) or both are compiled out (`optimized`); on `sanitized`, a planted use-after-free, leak and signed overflow are each reported by ASan, LSan and UBSan; no AVX/AVX-512 instruction in the stock core library (nothing built for the build machine's CPU) |
 | `smoke` | builds `test/fixtures/swarm-hello`, runs its test.py suite, fails above 40 Ninja steps (the warm cache was missed); `--strict-warnings`, `--quality-modules` and `--coverage` do what they promise, and the image's `gcovr` reports the module's coverage |

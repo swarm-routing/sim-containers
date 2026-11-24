@@ -175,20 +175,29 @@ ENV NS3_VERSION=${NS3_VERSION} \
     BASE_OS=${BASE_OS} \
     NS3DIR=/opt/ns-3
 
-# The ns3-containers commit that built the image. Declared here, after every
+# The sim-containers commit that built the image. Declared here, after every
 # build step, so a new commit changes only the image config, not a cached layer.
 ARG REVISION=unknown
 # The pipeline run that built the image: two runs of one commit would otherwise
 # produce byte-identical candidates from the cache, and one run's cleanup
 # could delete what the other is still testing (ns3-containers#52).
 ARG BUILD_RUN=local
-LABEL org.opencontainers.image.source="https://github.com/swarm-routing/ns3-containers" \
+# title and description name the image's ns-3 release, profile and base; the
+# same keys go on the image index as annotations at build time
+# (publish-images.yml), so the registry's package page shows them and the
+# promoted tags, a carbon copy of the tested digest, carry them (test/run.sh
+# `labels` checks both).
+LABEL org.opencontainers.image.source="https://github.com/swarm-routing/sim-containers" \
+      org.opencontainers.image.url="https://github.com/swarm-routing/sim-containers" \
+      org.opencontainers.image.documentation="https://github.com/swarm-routing/sim-containers#which-image" \
+      org.opencontainers.image.vendor="swarm-routing" \
       org.opencontainers.image.revision="${REVISION}" \
       io.github.swarm-routing.build-run="${BUILD_RUN}" \
       org.opencontainers.image.version="${NS3_VERSION}" \
       io.github.swarm-routing.ns3.profile="${BUILD_PROFILE}" \
       io.github.swarm-routing.ns3.base="${BASE_OS}" \
-      org.opencontainers.image.description="ns-3 with a warm Ninja build for swarm-routing contrib modules" \
+      org.opencontainers.image.title="ns3-dev ${NS3_VERSION} ${BUILD_PROFILE} (${BASE_OS})" \
+      org.opencontainers.image.description="ns-3 ${NS3_VERSION} ${BUILD_PROFILE} profile on ${BASE_OS}: a warm Ninja build for swarm-routing contrib modules" \
       org.opencontainers.image.licenses="GPL-2.0-only"
 
 WORKDIR /opt/ns-3

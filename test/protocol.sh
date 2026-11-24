@@ -31,7 +31,7 @@ set -euo pipefail
 MAX_STEPS=${MAX_STEPS:-40}
 NS3=${NS3DIR:-/opt/ns-3}
 envfile="$NS3/.swarm-modules.env"
-if [ ! -f "$envfile" ]; then
+if [[ ! -f "$envfile" ]]; then
     echo "  SKIP  no $envfile: not an ns3-protocol-dev image (the protocol stage applies to those only)"
     exit 0
 fi
@@ -45,20 +45,20 @@ bad() { echo "  FAIL  $*" >&2; fails=$((fails + 1)); }
 echo "protocol: the record ($envfile)"
 names=(); specs=()
 while read -r spec commit path; do
-    [ -n "$spec" ] || continue
+    [[ -n "$spec" ]] || continue
     name=${spec%%=*}; names+=("$name"); specs+=("$name=$path")
     ref=${spec#*@}; ref=${ref%%:*}
     [[ "$ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && ok "$name: release tag $ref" || bad "$name: '$ref' is not a release tag vX.Y.Z"
     [[ "$commit" =~ ^[0-9a-f]{40}$ ]] && ok "$name: commit $commit" || bad "$name: '$commit' is not a 40-char commit"
-    [ -f "$path/CMakeLists.txt" ] && ok "$name: sources at $path" || bad "$name: no CMakeLists.txt in $path"
-    [ "$(readlink "$NS3/contrib/$name" 2>/dev/null)" = "$path" ] && ok "$name: contrib/$name -> $path" \
+    [[ -f "$path/CMakeLists.txt" ]] && ok "$name: sources at $path" || bad "$name: no CMakeLists.txt in $path"
+    [[ "$(readlink "$NS3/contrib/$name" 2>/dev/null)" = "$path" ]] && ok "$name: contrib/$name -> $path" \
         || bad "$name: contrib/$name is not a link to $path"
     compgen -G "$NS3/build/lib/libns3*-${name}-*.so" >/dev/null && ok "$name: library built" || bad "$name: no library in $NS3/build/lib"
 done <<< "${SWARM_PREBUILT:-}"
-[ "${#names[@]}" -gt 0 ] || bad "SWARM_PREBUILT lists no module"
-[ "${SWARM_MODULE_SPECS:-}" = "${specs[*]}" ] && ok "SWARM_MODULE_SPECS = ${specs[*]}" \
+[[ "${#names[@]}" -gt 0 ]] || bad "SWARM_PREBUILT lists no module"
+[[ "${SWARM_MODULE_SPECS:-}" = "${specs[*]}" ]] && ok "SWARM_MODULE_SPECS = ${specs[*]}" \
     || bad "SWARM_MODULE_SPECS='${SWARM_MODULE_SPECS:-}', expected '${specs[*]}'"
-[ "${SWARM_MODULES:-}" = "${names[*]}" ] && ok "SWARM_MODULES = ${names[*]}" || bad "SWARM_MODULES='${SWARM_MODULES:-}', expected '${names[*]}'"
+[[ "${SWARM_MODULES:-}" = "${names[*]}" ]] && ok "SWARM_MODULES = ${names[*]}" || bad "SWARM_MODULES='${SWARM_MODULES:-}', expected '${names[*]}'"
 
 steps_of() { grep -oE '^\[[0-9]+/[0-9]+\]' "$1" | sed -E 's#.*/([0-9]+)\]#\1#' | sort -n | tail -1; }
 # A compile or link step of a prebuilt module's library or test library (its
@@ -75,7 +75,7 @@ echo "protocol: the prebuilt modules alone are up to date"
 # shellcheck disable=SC2086  # SWARM_MODULE_SPECS holds one word per module
 ns3-build-contrib $SWARM_MODULE_SPECS > "$work/alone.log" 2>&1 || { cat "$work/alone.log"; bad "ns3-build-contrib \$SWARM_MODULE_SPECS failed"; }
 again=$(rebuilt "$work/alone.log")
-[ -z "$again" ] && ok "nothing of theirs recompiled ($(steps_of "$work/alone.log") steps)" \
+[[ -z "$again" ]] && ok "nothing of theirs recompiled ($(steps_of "$work/alone.log") steps)" \
     || bad "prebuilt modules rebuilt (configure-line drift, invariant 10):"$'\n'"$again"
 
 echo "protocol: a protocol module compiles only itself"
@@ -89,10 +89,10 @@ else
 fi
 steps=$(steps_of "$work/consumer.log")
 echo "protocol: ninja steps for the protocol build = ${steps:-0} (max $MAX_STEPS)"
-[ "${steps:-0}" -le "$MAX_STEPS" ] && ok "warm: ${steps:-0} steps" || bad "${steps} steps: the warm tree was missed"
+[[ "${steps:-0}" -le "$MAX_STEPS" ]] && ok "warm: ${steps:-0} steps" || bad "${steps} steps: the warm tree was missed"
 again=$(rebuilt "$work/consumer.log")
-[ -z "$again" ] && ok "no prebuilt library or test object recompiled" \
+[[ -z "$again" ]] && ok "no prebuilt library or test object recompiled" \
     || bad "prebuilt modules rebuilt by a consumer build:"$'\n'"$again"
 
-[ "$fails" -eq 0 ] || { echo "protocol: $fails check(s) failed" >&2; exit 1; }
+[[ "$fails" -eq 0 ]] || { echo "protocol: $fails check(s) failed" >&2; exit 1; }
 echo "protocol: all checks passed"

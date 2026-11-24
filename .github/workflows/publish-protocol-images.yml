@@ -117,11 +117,12 @@ jobs:
           FORCE: ${{ inputs.force == true || github.event_name == 'pull_request' }}
           NS3_VERSION: ${{ inputs.ns3-version || 'latest' }}
         run: |
-          args=(--sha "$GITHUB_SHA" --ns3-version "$NS3_VERSION" --summary "$GITHUB_STEP_SUMMARY")
+          args=(--sha "$GITHUB_SHA" --ns3-version "$NS3_VERSION")
           # A pull request always builds: it tests the change, whatever is published.
           [ "$FORCE" = true ] && args+=(--force)
           echo "### ns3-protocol-dev inputs" >> "$GITHUB_STEP_SUMMARY"
-          matrix=$(python3 tools/protocol_images.py "${args[@]}")
+          # stdout: the matrix; stderr: one line per profile, build or skip and why
+          matrix=$(python3 tools/protocol_images.py "${args[@]}" 2> >(tee -a "$GITHUB_STEP_SUMMARY" >&2))
           count=$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])["include"]))' "$matrix")
           { echo "matrix=$matrix"; echo "count=$count"; } >> "$GITHUB_OUTPUT"
 

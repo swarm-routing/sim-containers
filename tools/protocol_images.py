@@ -4,7 +4,7 @@
 """Resolve what the protocol-CI images are built from, and whether to build.
 
     tools/protocol_images.py --sha SHA [--ns3-version latest|X.Y] [--force]
-        [--profiles debug,sanitized] [--summary FILE]
+        [--profiles debug,sanitized]
 
 ghcr.io/swarm-routing/ns3-protocol-dev (docker/protocol/Dockerfile) is an
 ns3-dev image with swarm-core and routing-bench prebuilt. Every input is
@@ -31,8 +31,9 @@ the base reusable-ns3-ci.yml uses. Tags of an entry (e.g. ns-3.49, swarm-core
   3.49-debug                                           rolling: the newest modules on 3.49
   latest-debug                                         rolling: the supported release (automatic builds only)
 
-Prints {"include": [entry, ...]} with only the entries to build; the reason
-for each profile goes to --summary as Markdown list lines.
+Prints {"include": [entry, ...]} with only the entries to build on stdout,
+and one Markdown list line per profile (build or skip, and why) on stderr,
+which the workflow appends to its step summary.
 """
 
 import argparse
@@ -150,7 +151,6 @@ def main(argv=None, ls=ls_remote, insp=inspect):
     ap.add_argument("--ns3-version", default="latest", help="latest (default) or an ns-3 release with an ns3-dev image, e.g. 3.48")
     ap.add_argument("--profiles", default=",".join(PROFILES))
     ap.add_argument("--force", action="store_true", help="build even when the versioned tag is up to date")
-    ap.add_argument("--summary", help="append one Markdown line per profile")
     a = ap.parse_args(argv)
     profiles = [p for p in a.profiles.split(",") if p]
     bad = [p for p in profiles if p not in PROFILES]
@@ -185,9 +185,6 @@ def main(argv=None, ls=ls_remote, insp=inspect):
                      + ", ".join(f"{m['name']} {m['spec']} ({m['commit'][:7]})" for m in mods))
         if build:
             include.append(e)
-    if a.summary:
-        with open(a.summary, "a", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
     print("\n".join(lines), file=sys.stderr)
     print(json.dumps({"include": include}, separators=(",", ":")))
     return 0

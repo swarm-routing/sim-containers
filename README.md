@@ -131,7 +131,7 @@ against 44 s on `sanitized`.
 resolves (ns3-dev `latest-*` by digest, each module's highest `vX.Y.Z` tag
 and its commit), after every successful *Publish images* run on main and
 daily, and only when an input changed; it is tested by digest
-(`test/run.sh` security, structure, smoke and `protocol`) before it is
+(`test/run.sh`, every stage but `labels` and `unit`, `protocol` included) before it is
 tagged.
 
 ## Need another distribution, version or compiler?

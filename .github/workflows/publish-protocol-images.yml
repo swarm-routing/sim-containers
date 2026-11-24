@@ -24,7 +24,7 @@ name: Publish protocol images
 #
 # Build once, test by digest, tag by copy (rule 17): the image is pushed
 # once as a candidate to ns3-dev-ci (`protocol-<run>-<attempt>-<profile>`),
-# test/run.sh's security, structure, smoke and protocol stages run on that
+# test/run.sh's stages but labels and unit run on that
 # digest, and only on main does promote copy it to its tags
 # (`imagetools create`), sign it, attest its provenance and SBOM; the
 # candidate is then deleted (a failed run leaves it for candidates-cleanup.yml,
@@ -238,9 +238,11 @@ jobs:
           EXPECT_OS: ubuntu
         # `labels` is ns3-dev's own label contract (this image overrides its
         # title, description and revision); the record step above checks this
-        # image's. `profile`, `integration` and `unit` test ns3-dev's tree,
-        # unchanged here and tested by Publish images before it was promoted.
-        run: test/run.sh --stages security,structure,smoke,protocol "$REF"
+        # image's. `unit` runs ns-3's own suites on the stock libraries, which
+        # this image does not rebuild (the protocol stage checks that no
+        # stock library is newer than the record): Publish images ran them,
+        # on these files, before it promoted the base.
+        run: test/run.sh --stages security,structure,profile,smoke,integration,protocol "$REF"
       - name: Install cosign
         if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3

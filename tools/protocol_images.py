@@ -181,6 +181,18 @@ def main(argv=None, ls=ls_remote, insp=inspect):
             print(f"warning: {err}; treated as not published", file=sys.stderr)
             existing = None
         build, why = decide(e, None if existing is None else existing[1], a.force)
+        if not build:
+            # Up to date, but a rolling tag may lag (an on-demand run of the
+            # supported release moves no latest-*): rebuild, so promote moves
+            # every tag to one tested digest.
+            for t in e["tags"].split()[2:]:
+                try:
+                    cur = insp(f"{IMAGE}:{t}")
+                except RuntimeError:
+                    cur = None
+                if cur is None or cur[0] != existing[0]:
+                    build, why = True, f"`{t}` is not on `{e['versioned']}`"
+                    break
         lines.append(f"- {p}: {'build' if build else 'skip'}: {why}; base `{base_ref}` = `{digest[:19]}`, "
                      + ", ".join(f"{m['name']} {m['spec']} ({m['commit'][:7]})" for m in mods))
         if build:

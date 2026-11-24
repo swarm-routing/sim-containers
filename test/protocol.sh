@@ -12,7 +12,8 @@
 # On a protocol image it proves the promise protocol CI relies on:
 #   1. the record: every prebuilt module (SWARM_PREBUILT) is at its path, a
 #      release tag and a 40-char commit, linked as contrib/<name> and built,
-#      and SWARM_MODULE_SPECS names exactly those paths;
+#      and SWARM_MODULE_SPECS names exactly those paths; no stock ns-3
+#      library is newer than the record (the image build compiled none);
 #   2. the prebuilt modules are what a consumer builds: ns3-build-contrib with
 #      SWARM_MODULE_SPECS alone compiles none of their objects again
 #      (invariant 10: same configure line, same quality hook);
@@ -59,6 +60,13 @@ done <<< "${SWARM_PREBUILT:-}"
 [[ "${SWARM_MODULE_SPECS:-}" = "${specs[*]}" ]] && ok "SWARM_MODULE_SPECS = ${specs[*]}" \
     || bad "SWARM_MODULE_SPECS='${SWARM_MODULE_SPECS:-}', expected '${specs[*]}'"
 [[ "${SWARM_MODULES:-}" = "${names[*]}" ]] && ok "SWARM_MODULES = ${names[*]}" || bad "SWARM_MODULES='${SWARM_MODULES:-}', expected '${names[*]}'"
+
+# The image's build added the modules and touched no stock ns-3 library (all
+# older than the record, written just before the build): ns3-dev's profile,
+# integration and unit results, earned on these very files, still hold.
+newer=$(find "$NS3/build/lib" -name 'libns3*' -newer "$envfile" | grep -vE -e "$(printf -- '-%s(-test)?-|' "${names[@]}")^$" || true)
+[[ -z "$newer" ]] && ok "no stock ns-3 library rebuilt by the image build" \
+    || bad "stock ns-3 libraries rebuilt after the record:"$'\n'"$newer"
 
 steps_of() { grep -oE '^\[[0-9]+/[0-9]+\]' "$1" | sed -E 's#.*/([0-9]+)\]#\1#' | sort -n | tail -1; }
 # A compile or link step of a prebuilt module's library or test library (its

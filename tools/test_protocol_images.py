@@ -95,13 +95,25 @@ class Matrix(unittest.TestCase):
         inc, _ = run(["--sha", SHA, "--profiles", "debug"], fake_inspect())
         e = inc[0]
         labels = {p.LABEL_BASE: e["base_image"], p.LABEL_DEPS: e["dependencies"], p.LABEL_RECIPE: e["recipe"]}
-        insp = fake_inspect({f"{p.IMAGE}:{e['versioned']}": ("sha256:" + "b" * 64, labels)})
+        same = ("sha256:" + "b" * 64, labels)
+        insp = fake_inspect({f"{p.IMAGE}:{t}": same for t in (e["versioned"], "3.49-debug", "latest-debug")})
         inc2, err = run(["--sha", SHA, "--profiles", "debug"], insp)
         self.assertEqual(inc2, [])
         self.assertIn("up to date", err)
         inc3, err = run(["--sha", SHA, "--profiles", "debug", "--force"], insp)
         self.assertEqual(len(inc3), 1)
         self.assertIn("forced", err)
+
+    def test_lagging_rolling_tag_rebuilds(self):
+        inc, _ = run(["--sha", SHA, "--profiles", "debug"], fake_inspect())
+        e = inc[0]
+        labels = {p.LABEL_BASE: e["base_image"], p.LABEL_DEPS: e["dependencies"], p.LABEL_RECIPE: e["recipe"]}
+        same = ("sha256:" + "b" * 64, labels)
+        insp = fake_inspect({f"{p.IMAGE}:{e['versioned']}": same, f"{p.IMAGE}:3.49-debug": same,
+                             f"{p.IMAGE}:latest-debug": ("sha256:" + "d" * 64, labels)})
+        inc2, err = run(["--sha", SHA, "--profiles", "debug"], insp)
+        self.assertEqual(len(inc2), 1)
+        self.assertIn("`latest-debug` is not on", err)
 
     def test_new_base_digest_rebuilds(self):
         inc, _ = run(["--sha", SHA, "--profiles", "debug"], fake_inspect())

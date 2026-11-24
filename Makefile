@@ -40,7 +40,7 @@ shell: ## an interactive shell in the dev image with this repo at /src
 	docker run --rm -it -v "$(CURDIR):/src" -w /src $(if $(PLATFORM),--platform $(PLATFORM)) $(NS3_IMAGE) bash
 
 headers: org-tools ## licence headers (org rule 1)
-	"$(ORG_DIR)/tools/checks/check-headers.sh" --dual docker/ --dual test/smoke.sh --dual test/run.sh --dual test/structure.sh --dual test/integration.sh --dual test/profile.sh --dual test/unit.sh --dual test/downstream.sh --dual tools/ --dual .github/workflows/ .
+	"$(ORG_DIR)/tools/checks/check-headers.sh" --dual docker/ --dual test/smoke.sh --dual test/run.sh --dual test/structure.sh --dual test/integration.sh --dual test/profile.sh --dual test/unit.sh --dual test/downstream.sh --dual test/protocol.sh --dual tools/ --dual .github/workflows/ .
 
 check: lint test headers org-sync-check ## everything CI gates on
 

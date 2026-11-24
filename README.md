@@ -87,6 +87,53 @@ Modules built: `core network internet wifi mesh mobility energy flow-monitor
 applications point-to-point csma aodv olsr dsdv dsr stats` (plus their
 dependencies).
 
+### The protocol-CI image (`ns3-protocol-dev`)
+
+`ghcr.io/swarm-routing/ns3-protocol-dev` is an ns3-dev image with the two
+modules every swarm-routing protocol builds on already built in its warm
+tree: **swarm-core** (swarm-routing/swarm-adapter-ns3) and **routing-bench**
+(swarm-routing/sim-tools `ns3/routing-bench`), each at its newest release
+tag. A protocol's CI on it compiles only the protocol module. Profiles
+`debug` and `sanitized` (what CI consumes), Ubuntu.
+
+| Tag | Image |
+|---|---|
+| `:latest-debug`, `:latest-sanitized` | the supported ns-3 release with the newest module releases |
+| `:3.49-debug` | that ns-3 release with the newest module releases |
+| `:3.49-debug-swarmcore2.0.0-routingbench1.1.3` | those exact versions (rebuilt when ns3-dev's image moves) |
+| the tag above + `-<sha7>` | immutable: the sim-containers commit that built it |
+
+Use the image's paths for the prebuilt modules, listed first, and your own
+module after them; `--quality-modules` keeps the quality options off the
+prebuilt ones:
+
+```bash
+docker run --rm -v "$PWD:/src/ara:ro" ghcr.io/swarm-routing/ns3-protocol-dev:latest-debug bash -c \
+    '. /opt/ns-3/.swarm-modules.env && ns3-build-contrib --strict-warnings --quality-modules ara \
+         --test $SWARM_MODULE_SPECS ara=/src/ara/ns3'
+```
+
+`/opt/ns-3/.swarm-modules.env` records each module (`SWARM_PREBUILT`: its
+repository, tag, commit and path), and the image labels carry the same
+(`io.github.swarm-routing.dependencies`, `.swarm-core.version`,
+`.routing-bench.version`, `.ns3-dev.image`: the ns3-dev digest it was built
+on). The org's `reusable-ns3-ci.yml` uses it with `protocol-image: true`: a
+`dependencies` entry at the commit the image holds is used prebuilt, any other
+is built from source over it, as before. Measured on ns-3.49 with ARA
+(swarm-core v2.0.0, routing-bench v1.1.3, `--strict-warnings`, 4 cores): 67
+Ninja steps on ns3-dev, 33 on ns3-protocol-dev (ARA's own 18, the
+routing-bench programs rebuilt with ARA's arm registered, the executables
+that link every module); the build took 50 s against 20 s on `debug`, 115 s
+against 44 s on `sanitized`.
+
+*Publish protocol images* (`publish-protocol-images.yml`) builds it from
+`docker/protocol/Dockerfile` with the inputs `tools/protocol_images.py`
+resolves (ns3-dev `latest-*` by digest, each module's highest `vX.Y.Z` tag
+and its commit), after every successful *Publish images* run on main and
+daily, and only when an input changed; it is tested by digest
+(`test/run.sh` security, structure, smoke and `protocol`) before it is
+tagged.
+
 ## Need another distribution, version or compiler?
 
 The published set is deliberately small: the release ns-3 supports (older

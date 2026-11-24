@@ -1,0 +1,360 @@
+# Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
+# SPDX-License-Identifier: MIT OR GPL-2.0-only
+name: Publish protocol images
+
+# Builds ghcr.io/swarm-routing/ns3-protocol-dev (docker/protocol/Dockerfile):
+# ns3-dev with swarm-core and routing-bench prebuilt at their newest
+# releases, for protocol repositories' CI (reusable-ns3-ci.yml's
+# `protocol-image` input in swarm-routing/.github), so their legs compile only
+# the protocol module. Debug and sanitized, on Ubuntu: what CI consumes (rule 12).
+#
+# What is built comes from tools/protocol_images.py, never from a typed list
+# (rules 13, 15): the base is ns3-dev's latest-<profile> by digest (the
+# release ns-3 supports, after ns3-dev's own canary), each module the highest
+# vX.Y.Z tag of its repository and the commit it names. An image is built
+# only when its versioned tag is missing or was built from other inputs, so
+#
+#   workflow_run   after every successful Publish images run on main: a new
+#                  ns3-dev digest (new ns-3 release, image change, OS
+#                  refresh) rebuilds both profiles; an unchanged one, nothing
+#   schedule       daily: a new swarm-core or sim-tools release rebuilds
+#   dispatch       `force` rebuilds what is up to date; `ns3-version` builds
+#                  an older release on demand (no latest-* move, rule 16)
+#   pull_request   a change to these files builds and tests, never tags
+#
+# Build once, test by digest, tag by copy (rule 17): the image is pushed
+# once as a candidate to ns3-dev-ci (`protocol-<run>-<attempt>-<profile>`),
+# test/run.sh's security, structure, smoke and protocol stages run on that
+# digest, and only on main does promote copy it to its tags
+# (`imagetools create`), sign it, attest its provenance and SBOM; the
+# candidate is then deleted (a failed run leaves it for candidates-cleanup.yml,
+# 2 days). A fork PR loads the image and tests it in place.
+#
+# Tags (tools/protocol_images.py): <ns3>-<profile>-swarmcore<v>-routingbench<v>,
+# its immutable -<sha7> twin (never moved once set), <ns3>-<profile> and
+# latest-<profile>. No buildx cache: the build is one incremental layer
+# (about a minute on debug) over the ns3-dev image it pulls.
+on:
+  workflow_run:
+    workflows: [Publish images]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '43 5 * * *'   # daily: pick up a new swarm-core or sim-tools release
+  pull_request:
+    paths:
+      - docker/protocol/Dockerfile
+      - tools/protocol_images.py
+      - test/protocol.sh
+      - test/fixtures/protocol-hello/**
+      - test/run.sh
+      - .github/workflows/publish-protocol-images.yml
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Rebuild even when the versioned tag is up to date'
+        type: boolean
+        default: false
+      ns3-version:
+        description: 'On demand: an older ns-3 release with an ns3-dev debug/sanitized image (e.g. 3.48); empty = the supported release (latest-*)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: protocol-images-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/ns3-protocol-dev
+  CANDIDATE: ghcr.io/${{ github.repository_owner }}/ns3-dev-ci
+  WRITE_REGISTRY: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+  # Same pin as test/run.sh's security stage.
+  TRIVY: ghcr.io/aquasecurity/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+
+jobs:
+  resolve:
+    name: resolve the inputs
+    # After Publish images: only a successful run of this repository's main
+    # (push, schedule or dispatch), never one of a pull request.
+    if: >-
+      ${{ github.event_name != 'workflow_run'
+          || (github.event.workflow_run.conclusion == 'success'
+              && github.event.workflow_run.head_repository.full_name == github.repository
+              && github.event.workflow_run.event != 'pull_request') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+      count: ${{ steps.m.outputs.count }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
+        timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test the resolver
+        run: python3 -m unittest tools/test_protocol_images.py -v
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GHCR
+        if: env.WRITE_REGISTRY == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve the base, the module releases and what to build
+        id: m
+        env:
+          FORCE: ${{ inputs.force == true || github.event_name == 'pull_request' }}
+          NS3_VERSION: ${{ inputs.ns3-version || 'latest' }}
+        run: |
+          args=(--sha "$GITHUB_SHA" --ns3-version "$NS3_VERSION" --summary "$GITHUB_STEP_SUMMARY")
+          # A pull request always builds: it tests the change, whatever is published.
+          [ "$FORCE" = true ] && args+=(--force)
+          echo "### ns3-protocol-dev inputs" >> "$GITHUB_STEP_SUMMARY"
+          matrix=$(python3 tools/protocol_images.py "${args[@]}")
+          count=$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])["include"]))' "$matrix")
+          { echo "matrix=$matrix"; echo "count=$count"; } >> "$GITHUB_OUTPUT"
+
+  image:
+    name: ns3-protocol-dev ${{ matrix.profile }}
+    needs: resolve
+    if: needs.resolve.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write      # candidate push, tags, attestations in the registry
+      id-token: write      # keyless cosign signature + provenance
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
+    env:
+      LOCAL: ns3-protocol-dev-local:${{ matrix.profile }}
+      CANDIDATE_TAG: protocol-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.profile }}
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
+        timeout-minutes: 2  # its download and start take seconds (swarm-routing/.github#164)
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GHCR
+        if: env.WRITE_REGISTRY == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The one and only build of this image.
+      - name: Build once (push the candidate)
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/protocol/Dockerfile
+          build-args: |
+            BASE_IMAGE=${{ matrix.base_image }}
+            SWARM_CORE_SPEC=${{ matrix.swarm_core_spec }}
+            SWARM_CORE_COMMIT=${{ matrix.swarm_core_commit }}
+            SWARM_CORE_VERSION=${{ matrix.swarm_core_version }}
+            ROUTING_BENCH_SPEC=${{ matrix.routing_bench_spec }}
+            ROUTING_BENCH_COMMIT=${{ matrix.routing_bench_commit }}
+            ROUTING_BENCH_VERSION=${{ matrix.routing_bench_version }}
+            DEPENDENCIES=${{ matrix.dependencies }}
+            RECIPE=${{ matrix.recipe }}
+            REVISION=${{ github.sha }}
+            BUILD_RUN=${{ github.run_id }}-${{ github.run_attempt }}
+          tags: ${{ env.WRITE_REGISTRY == 'true' && format('{0}:{1}', env.CANDIDATE, env.CANDIDATE_TAG) || env.LOCAL }}
+          push: ${{ env.WRITE_REGISTRY == 'true' }}
+          load: ${{ env.WRITE_REGISTRY != 'true' }}
+      - name: The image under test
+        id: ref
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          if [ "$WRITE_REGISTRY" = true ]; then
+            case "$DIGEST" in sha256:*) ;; *) echo "no digest from the build: '$DIGEST'" >&2; exit 1 ;; esac
+            echo "ref=${CANDIDATE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+            echo "candidate \`${CANDIDATE}@${DIGEST}\`" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ref=${LOCAL}" >> "$GITHUB_OUTPUT"
+          fi
+      # The labels and /opt/ns-3/.swarm-modules.env record what the resolver chose.
+      - name: The record matches the inputs
+        env:
+          REF: ${{ steps.ref.outputs.ref }}
+          ENTRY: ${{ toJSON(matrix) }}
+        run: |
+          docker pull -q "$REF" > /dev/null 2>&1 || true
+          docker image inspect --format '{{json .Config.Labels}}' "$REF" > labels.json
+          docker run --rm "$REF" cat /opt/ns-3/.swarm-modules.env > modules.env
+          python3 - <<'PY'
+          import json, os, re, sys
+          e = json.loads(os.environ["ENTRY"])
+          labels = json.load(open("labels.json"))
+          env = open("modules.env").read()
+          want = {
+              "io.github.swarm-routing.ns3-dev.image": e["base_image"],
+              "io.github.swarm-routing.dependencies": e["dependencies"],
+              "io.github.swarm-routing.protocol-image.recipe": e["recipe"],
+              "io.github.swarm-routing.swarm-core.version": e["swarm_core_version"],
+              "io.github.swarm-routing.routing-bench.version": e["routing_bench_version"],
+              "io.github.swarm-routing.ns3.profile": e["profile"],
+              "org.opencontainers.image.version": e["ns3"],
+          }
+          bad = [f"{k}={labels.get(k)!r}, expected {v!r}" for k, v in want.items() if labels.get(k) != v]
+          for name in ("swarm-core", "routing-bench"):
+              k = name.replace("-", "_")
+              line = f"{name}={e[k + '_spec']} {e[k + '_commit']} /opt/swarm-modules/{name}"
+              if not re.search("^" + re.escape(line) + '"?$', env, re.M):
+                  bad.append(f".swarm-modules.env has no line {line!r}")
+          if f'SWARM_BASE_IMAGE="{e["base_image"]}"' not in env:
+              bad.append(".swarm-modules.env names another base image")
+          for b in bad:
+              print("::error::" + b)
+          sys.exit(1 if bad else 0)
+          PY
+          echo "record ok: $(grep -c '^' modules.env) lines, labels match" >> "$GITHUB_STEP_SUMMARY"
+      - name: Test by digest (test/run.sh)
+        env:
+          REF: ${{ steps.ref.outputs.ref }}
+          EXPECT_VERSION: ${{ matrix.ns3 }}
+          EXPECT_PROFILE: ${{ matrix.profile }}
+          EXPECT_OS: ubuntu
+        # `labels` is ns3-dev's own label contract (this image overrides its
+        # title, description and revision); the record step above checks this
+        # image's. `profile`, `integration` and `unit` test ns3-dev's tree,
+        # unchanged here and tested by Publish images before it was promoted.
+        run: test/run.sh --stages security,structure,smoke,protocol "$REF"
+      - name: Install cosign
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        timeout-minutes: 2
+      - name: SBOM (CycloneDX, Trivy pinned by digest)
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ENTRY: ${{ toJSON(matrix) }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD "$TRIVY" image --quiet \
+            --image-src remote --format cyclonedx "${CANDIDATE}@${DIGEST}" > sbom.cdx.json
+          # ns-3 and the two modules are built from source: added as components.
+          python3 - <<'PY'
+          import json, os
+          e = json.loads(os.environ["ENTRY"])
+          bom = json.load(open("sbom.cdx.json"))
+          comps = bom.setdefault("components", [])
+          purl = f"pkg:git/gitlab.com/nsnam/ns-3-dev@ns-{e['ns3']}"
+          comps.append({"type": "framework", "bom-ref": purl, "name": "ns-3", "version": e["ns3"], "purl": purl,
+                        "licenses": [{"license": {"id": "GPL-2.0-only"}}],
+                        "properties": [{"name": "swarm-routing:path", "value": "/opt/ns-3"}]})
+          for name in ("swarm-core", "routing-bench"):
+              k = name.replace("-", "_")
+              repo = e[k + "_spec"].split("@")[0]
+              purl = f"pkg:github/{repo}@{e[k + '_commit']}"
+              comps.append({"type": "library", "bom-ref": purl, "name": name, "version": e[k + "_version"],
+                            "purl": purl, "licenses": [{"license": {"id": "GPL-2.0-only"}}],
+                            "properties": [{"name": "swarm-routing:path", "value": f"/opt/swarm-modules/{name}"}]})
+          json.dump(bom, open("sbom.cdx.json", "w"), indent=1)
+          print(f"SBOM: {len(comps)} components")
+          PY
+      - name: Tag the tested digest (carbon copy, no rebuild)
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAGS: ${{ matrix.tags }}
+        run: |
+          # The -<sha7> tag is an immutable pin, as on ns3-dev: once set it
+          # never moves; the other tags follow the newest tested digest.
+          sha7="${GITHUB_SHA::7}"
+          set_tags=(); kept=()
+          for t in $TAGS; do
+            if [[ "$t" != *"-${sha7}" ]]; then set_tags+=("$t"); continue; fi
+            if out=$(docker buildx imagetools inspect "${IMAGE}:${t}" --format '{{json .Manifest}}' 2>&1); then
+              cur=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])' <<<"$out")
+              if [ "$cur" = "$DIGEST" ]; then set_tags+=("$t"); else kept+=("$t ($cur)"); fi
+            elif grep -qiE 'not found|manifest unknown' <<<"$out"; then
+              set_tags+=("$t")
+            else
+              echo "$out" >&2
+              echo "::error::cannot tell whether ${IMAGE}:${t} exists; not promoting"; exit 1
+            fi
+          done
+          args=()
+          for t in "${set_tags[@]}"; do args+=(-t "${IMAGE}:${t}"); done
+          docker buildx imagetools create "${args[@]}" "${CANDIDATE}@${DIGEST}"
+          for k in "${kept[@]}"; do echo "kept immutable pin \`$k\`" >> "$GITHUB_STEP_SUMMARY"; done
+          for t in "${set_tags[@]}"; do
+            got=$(docker buildx imagetools inspect "${IMAGE}:${t}" --format '{{json .Manifest}}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')
+            [ "$got" = "$DIGEST" ] || { echo "::error::${IMAGE}:${t} is $got, tested $DIGEST"; exit 1; }
+          done
+          { echo "promoted \`${IMAGE}@${DIGEST}\`:"; for t in "${set_tags[@]}"; do echo "- \`$t\`"; done; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Sign (keyless, by digest)
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+      - name: Attest provenance
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Attest SBOM
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: sbom.cdx.json
+          push-to-registry: true
+      - name: Verify the signature
+        if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IDENTITY: https://github.com/${{ github.workflow_ref }}
+        run: |
+          cosign verify --certificate-identity "$IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "${IMAGE}@${DIGEST}" > /dev/null
+          echo "signature verified for \`$IDENTITY\`" >> "$GITHUB_STEP_SUMMARY"
+      # A clean run deletes its candidate (the index and its child manifests);
+      # a failed one keeps it for "re-run failed jobs", and candidates-cleanup.yml
+      # removes it after 2 days.
+      - name: Discard the candidate
+        if: success() && env.WRITE_REGISTRY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ORG: ${{ github.repository_owner }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          { echo "$DIGEST"
+            docker buildx imagetools inspect --raw "${CANDIDATE}@${DIGEST}" \
+              | python3 -c 'import json,sys; [print(m["digest"]) for m in json.load(sys.stdin).get("manifests", [])]'
+          } > doomed
+          base="/orgs/${ORG}/packages/container/ns3-dev-ci/versions"
+          gh api --paginate "${base}?per_page=100" --jq '.[] | "\(.id) \(.name)"' > versions
+          n=0
+          while read -r id name; do
+            grep -qxF "$name" doomed || continue
+            gh api -X DELETE "${base}/${id}" > /dev/null 2>&1 && n=$((n + 1)) \
+              || echo "::warning::could not delete candidate version ${id} (candidates-cleanup takes it later)"
+          done < versions
+          echo "discarded ${n} candidate versions" >> "$GITHUB_STEP_SUMMARY"

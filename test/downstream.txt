@@ -30,10 +30,10 @@
 # release is the supported one. AntHocNet runs the suites and the example its
 # own `latest` leg runs (its AODV-family gates are on 3.48 for the same reason).
 
-ns3-swarm-core | swarm-routing/ns3-swarm-core@main | 3.42+ | swarm-core=ns3-swarm-core | | |
+swarm-adapter-ns3 | swarm-routing/swarm-adapter-ns3@main | 3.42+ | swarm-core=swarm-adapter-ns3 | | |
 ns3-tools | swarm-routing/ns3-tools@main | 3.42+ | routing-bench=ns3-tools/ns3/routing-bench | | | bash tools/checks/check-stock-arms.sh /opt/ns-3 "olsr dsdv hwmp"
 AntHocNet | swarm-routing/AntHocNet@main | 3.36+ | swarm-core=AntHocNet/.stage/contrib/swarm-core routing-bench=AntHocNet/.stage/contrib/routing-bench oracle=AntHocNet/.stage/contrib/oracle aomdv=AntHocNet/.stage/contrib/aomdv gpsr=AntHocNet/.stage/contrib/gpsr adaptive=AntHocNet/.stage/contrib/adaptive anthocnet=AntHocNet/.stage/contrib/anthocnet | anthocnet oracle adaptive routing-bench | mkdir -p .stage/contrib && touch .stage/CMakeLists.txt && make -s install-ns3 NS3DIR="$PWD/.stage" | cd /opt/ns-3 && ./ns3 run --no-build anthocnet-example
-ARA | swarm-routing/ARA@main | 3.42+ | swarm-core=ns3-swarm-core ara=ARA/ns3 | | |
-BeeAdHoc | swarm-routing/BeeAdHoc@main | 3.42+ | swarm-core=ns3-swarm-core beeadhoc=BeeAdHoc/ns3 | | |
-Termite | swarm-routing/Termite@main | 3.42+ | swarm-core=ns3-swarm-core termite=Termite/ns3 | | |
-HOPNET | swarm-routing/HOPNET@main | 3.42+ | swarm-core=ns3-swarm-core hopnet=HOPNET/ns3 | | |
+ARA | swarm-routing/ARA@main | 3.42+ | swarm-core=swarm-adapter-ns3 ara=ARA/ns3 | | |
+BeeAdHoc | swarm-routing/BeeAdHoc@main | 3.42+ | swarm-core=swarm-adapter-ns3 beeadhoc=BeeAdHoc/ns3 | | |
+Termite | swarm-routing/Termite@main | 3.42+ | swarm-core=swarm-adapter-ns3 termite=Termite/ns3 | | |
+HOPNET | swarm-routing/HOPNET@main | 3.42+ | swarm-core=swarm-adapter-ns3 hopnet=HOPNET/ns3 | | |

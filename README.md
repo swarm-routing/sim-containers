@@ -116,7 +116,7 @@ image's own flags (stored in `/opt/ns-3/.swarm-configure.env`), builds, then
 runs the test suites and programs. Dependencies go first:
 
 ```bash
-ns3-build-contrib swarm-core=/src/ns3-swarm-core ara=/src/ARA/ns3 --test
+ns3-build-contrib swarm-core=/src/swarm-adapter-ns3 ara=/src/ARA/ns3 --test
 ```
 
 Two quality options touch the named modules only, never ns-3, so the build
@@ -145,7 +145,7 @@ stays incremental:
 
 - `--quality-modules "a;b"` limits both to those modules (default: every
   module given), so a dependency built alongside is not judged:
-  `ns3-build-contrib --strict-warnings --quality-modules ara swarm-core=/src/ns3-swarm-core ara=/src/ara/ns3`.
+  `ns3-build-contrib --strict-warnings --quality-modules ara swarm-core=/src/swarm-adapter-ns3 ara=/src/ara/ns3`.
 
 The org's `reusable-ns3-ci.yml` turns them on with its `strict-warnings` and
 `coverage` inputs.
@@ -288,7 +288,7 @@ More stages are coming (#36): fixed-seed regression.
 **Downstream canary** (#44). Before `latest-*` moves, every org ns-3 module
 listed in [`test/downstream.txt`](test/downstream.txt) is built and tested on
 the new ubuntu `debug` candidate by `test/downstream.sh <image>`: today all
-seven lines are built and tested: `ns3-swarm-core` (`swarm-core`), `ns3-tools`
+seven lines are built and tested: `swarm-adapter-ns3` (`swarm-core`), `ns3-tools`
 (`routing-bench` + its stock-arm delivery check, without `aodv` while #35
 lasts), AntHocNet (its seven modules, swarm-core included, staged by
 `make install-ns3`, its suites and `anthocnet-example`), and ARA, BeeAdHoc, Termite and HOPNET (each

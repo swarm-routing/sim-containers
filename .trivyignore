@@ -1,5 +1,5 @@
 # Trivy findings accepted for the ns3-dev images, each with its reason
-# (ns3-containers#38). Only the security stage's Dockerfile scan reads this;
+# (sim-containers#38). Only the security stage's Dockerfile scan reads this;
 # the vulnerability and secret scans take no exceptions.
 
 # DS-0002 (HIGH) "no non-root USER": deliberate. The images are build

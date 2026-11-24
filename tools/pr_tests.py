@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
-"""Pick the test jobs a pull request's images need (ns3-containers#86, #87).
+"""Pick the test jobs a pull request's images need (sim-containers#86, #87).
 
     tools/pr_tests.py refs --matrix JSON --digests DIR --candidate REF --image REF
     tools/pr_tests.py select --matrix JSON --inspect DIR [--summary FILE]

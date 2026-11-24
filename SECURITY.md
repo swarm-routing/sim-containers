@@ -1,6 +1,6 @@
 # Security Policy
 
-`swarm-routing/ns3-containers` is the org's ns-3 development images (`ghcr.io/swarm-routing/ns3-dev`), used by every repository's CI. This document records its
+`swarm-routing/sim-containers` is the org's ns-3 development images (`ghcr.io/swarm-routing/ns3-dev`), used by every repository's CI. This document records its
 security posture honestly; it promises nothing the code does not do. The
 org-wide policy is [swarm-routing/.github SECURITY.md](https://github.com/swarm-routing/.github/blob/main/SECURITY.md).
 
@@ -38,13 +38,20 @@ best-effort basis: expect an acknowledgement within a few days, not an SLA.
 
 ```bash
 cosign verify \
-  --certificate-identity https://github.com/swarm-routing/ns3-containers/.github/workflows/publish-images.yml@refs/heads/main \
+  --certificate-identity-regexp '^https://github\.com/swarm-routing/(sim|ns3)-containers/\.github/workflows/publish-images\.yml@refs/heads/main$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   ghcr.io/swarm-routing/ns3-dev:<tag>
 gh attestation verify oci://ghcr.io/swarm-routing/ns3-dev:<tag> --owner swarm-routing
 ```
 
 The first check is the signature; the second, the build provenance. The
+signatures are in the Sigstore bundle format, so `cosign verify` needs
+cosign 3 or later (cosign 2 reports "no signatures found"). Images signed
+since the repository was renamed (2026-11-22) carry the identity
+`https://github.com/swarm-routing/sim-containers/.github/workflows/publish-images.yml@refs/heads/main`,
+older ones the same path under `ns3-containers`; the expression accepts
+exactly those two, and `--certificate-identity` with the first one checks a
+current image alone. The
 CycloneDX SBOM is attested the same way: add
 `--predicate-type https://cyclonedx.org/bom`. For a
 published number, pin an immutable `-<sha7>` tag or a digest, never a

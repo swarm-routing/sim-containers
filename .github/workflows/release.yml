@@ -8,7 +8,7 @@ name: Release
 #   dispatch `bump`     open the PR `chore(release): bump version A to B`
 #                       from bot/release (Commitizen, .cz.toml);
 #   merge that PR       the release: `make dist` builds and checks the asset
-#                       (ns3-containers-<ver>.tar.gz, the image pipeline's
+#                       (sim-containers-<ver>.tar.gz, the image pipeline's
 #                       source; tools/release/dist.sh), then SBOM, checksums,
 #                       signed provenance, the v<ver> tag and the GitHub release.
 # `increment` forces the bump (cz bump --increment, swarm-routing/.github#211):

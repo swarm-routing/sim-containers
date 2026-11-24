@@ -5,8 +5,8 @@
 # dist.sh VERSION OUT-DIR: the release asset, as `make dist` runs it for
 # swarm-routing/.github's reusable-release.yml:
 #
-#   ns3-containers-VERSION.tar.gz   the image pipeline's source at the release:
-#                                   ns3-containers-VERSION/ with docker/ (the
+#   sim-containers-VERSION.tar.gz   the image pipeline's source at the release:
+#                                   sim-containers-VERSION/ with docker/ (the
 #                                   Dockerfile, ns3-build-contrib), test/ (the
 #                                   stages, fixtures, suite lists), tools/ (the
 #                                   matrix generator and its tests),
@@ -42,16 +42,16 @@ out=$(cd "$out" && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 epoch=$(git -C "$repo" log -1 --format=%ct)
-name="ns3-containers-$ver"
+name="sim-containers-$ver"
 
-# --- ns3-containers-VERSION.tar.gz ------------------------------------------
+# --- sim-containers-VERSION.tar.gz ------------------------------------------
 pkg="$tmp/pkg/$name"
 mkdir -p "$pkg"
 git -C "$repo" ls-files -z -- docker test tools .github/workflows .dockerignore .hadolint.yaml \
         .trivyignore README.md LICENSE LICENSE-MIT LICENSING.md CITATION.cff |
     (cd "$repo" && xargs -0 cp --parents -t "$pkg")
 cat > "$pkg/INSTALL.txt" <<TXT
-ns3-containers $ver (swarm-routing/ns3-containers): the pipeline behind
+sim-containers $ver (swarm-routing/sim-containers): the pipeline behind
 ghcr.io/swarm-routing/ns3-dev, ns-3 configured and built at /opt/ns-3 so a
 contrib module compiles alone. docker/, test/*.sh and tools/ are MIT OR
 GPL-2.0-only; the rest, and the images, GPL-2.0-only (LICENSING.md).
@@ -70,7 +70,7 @@ Build one image from this tree and run every test stage on it:
 
 The release versions the pipeline and its contract (tags, profiles, bases,
 ns3-build-contrib); the image tags stay the ns-3 release.
-Source: https://github.com/swarm-routing/ns3-containers/tree/v$ver
+Source: https://github.com/swarm-routing/sim-containers/tree/v$ver
 TXT
 tar --sort=name --owner=0 --group=0 --numeric-owner --mtime="@${epoch}" \
     -C "$tmp/pkg" -cf - "$name" | gzip -n > "$out/$name.tar.gz"

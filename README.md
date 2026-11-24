@@ -1,4 +1,4 @@
-# ns3-containers
+# sim-containers
 
 <!-- org-sync:begin badges -->
 | Group | Badges |
@@ -65,7 +65,7 @@ with SIGILL on another CPU.
 | `:3.49`, `:3.49-debug` (`-default`, `-sanitized`, `-optimized`) | Ubuntu, that release and profile |
 | `:3.49-debian-debug`, `:3.49-slim` (`= -slim-default`) | other bases |
 | `:3.46-debug` and `:3.46.1-debug` | a patch release is tagged under both numbers |
-| any versioned tag + `-<sha7>` | immutable: the ns3-containers commit that built it |
+| any versioned tag + `-<sha7>` | immutable: the sim-containers commit that built it |
 
 CI that should track ns-3 uses `latest-debug` / `latest-sanitized`; anything
 that produces a published number pins a versioned `-<sha7>` tag.
@@ -144,7 +144,7 @@ hosts run these Linux images through Docker Desktop, Colima or WSL2.
 If your work needs something else (another distribution or release, such as
 Rocky Linux or Ubuntu 22.04; a specific compiler, such as clang or an older
 gcc; an older ns-3 release that should be built or maintained; extra ns-3 modules or features such
-as MPI or Python bindings), **[open an *Image request* issue](https://github.com/swarm-routing/ns3-containers/issues/new?template=image-request.yml)**
+as MPI or Python bindings), **[open an *Image request* issue](https://github.com/swarm-routing/sim-containers/issues/new?template=image-request.yml)**
 with your ns-3 requirements: version, distribution, compiler, profile,
 architecture, the modules you need, and why an existing image does not fit.
 Requests that name a concrete lab, cluster or CI constraint are what get an
@@ -384,8 +384,8 @@ evidence; this is the summary a user of the images needs.
 
 | ns-3 | What | Status |
 |---|---|---|
-| **3.49** (the supported release, `latest`) | **Stock AODV never finishes a sparse MANET run.** ns-3.49's new `Ipv4L3Protocol::SendIcmpNoRoute` (RFC 1812 ICMP "net unreachable") feeds back into AODV's deferred route output: the ICMP error has no route either, is queued through loopback into the full request queue, whose drop raises another ICMP error, all at one simulated instant (1,284,336 errors at +8.146253127 s in one run). Simulated time stops; the process spins until killed. OLSR and DSDV are unaffected; AODV-derived protocols (AntHocNet's vendored AOMDV) hang too. Reproducer, stock models only: [`manet-canary`](test/fixtures/manet-canary/) `--protocol=aodv --range=100`, which finishes in 2 s on 3.48 and never on 3.49; stock `manet-routing-compare` with its defaults does *not* trigger it. ns-3-dev still has the code (2026-11-01); no upstream report filed yet. | upstream bug; reproduced on every run as a strict expected failure (`test/known-failures.txt`); [#35](https://github.com/swarm-routing/ns3-containers/issues/35), [AntHocNet#843](https://github.com/swarm-routing/AntHocNet/issues/843); the org's register: [NS3-001](https://github.com/swarm-routing/ns3-tools/blob/main/docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md) |
-| **3.48** (history, on demand) | **Four wifi unit suites fail** (`wifi-txop`, `wifi-mlo`, `wifi-gcr`, `wifi-emlsr-basic-exchanges`) with the images' 16-module set, on both profiles; they **pass** on 3.48 with every ns-3 module and on 3.49 with the images' set. With the images' set the simulation transmits fewer frames than the test expects, and the test then indexes past its frame list (UBSan: member call on an invalid `WifiMacHeader` at `wifi-txop-test.cc:1427`, a SIGSEGV without sanitizers). The suites test 802.11ax/be machinery (EMLSR, MLO, groupcast, TXOP limits) that 802.11a/b ad-hoc MANET work does not use. | cause not yet classified (module dependency vs ns-3 test bug); an on-demand 3.48 build fails the `unit` stage until it is; [#49](https://github.com/swarm-routing/ns3-containers/issues/49) |
+| **3.49** (the supported release, `latest`) | **Stock AODV never finishes a sparse MANET run.** ns-3.49's new `Ipv4L3Protocol::SendIcmpNoRoute` (RFC 1812 ICMP "net unreachable") feeds back into AODV's deferred route output: the ICMP error has no route either, is queued through loopback into the full request queue, whose drop raises another ICMP error, all at one simulated instant (1,284,336 errors at +8.146253127 s in one run). Simulated time stops; the process spins until killed. OLSR and DSDV are unaffected; AODV-derived protocols (AntHocNet's vendored AOMDV) hang too. Reproducer, stock models only: [`manet-canary`](test/fixtures/manet-canary/) `--protocol=aodv --range=100`, which finishes in 2 s on 3.48 and never on 3.49; stock `manet-routing-compare` with its defaults does *not* trigger it. ns-3-dev `master` still has the code; reported upstream as [nsnam/ns-3-dev#1408](https://gitlab.com/nsnam/ns-3-dev/-/work_items/1408), fix proposed in [nsnam/ns-3-dev!3101](https://gitlab.com/nsnam/ns-3-dev/-/merge_requests/3101) (open, not ours). The images stay stock; the org works around it in the harness: sim-tools' `routing-bench` (v1.1.3+) installs AODV behind its `IcmpErrorGuardHelper`, which applies !3101's suppression rules ([swarm-routing/sim-tools#322](https://github.com/swarm-routing/sim-tools/pull/322)). | upstream bug, open; reproduced on every run as a strict expected failure (`test/known-failures.txt`); [#35](https://github.com/swarm-routing/sim-containers/issues/35), [AntHocNet#843](https://github.com/swarm-routing/AntHocNet/issues/843); the org's register: [NS3-001](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-bugs.md) ([root cause](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md)) |
+| **3.48** (history, on demand) | **Four wifi unit suites fail** (`wifi-txop`, `wifi-mlo`, `wifi-gcr`, `wifi-emlsr-basic-exchanges`) with the images' 16-module set, on both profiles; they **pass** on 3.48 with every ns-3 module and on 3.49 with the images' set. With the images' set the simulation transmits fewer frames than the test expects, and the test then indexes past its frame list (UBSan: member call on an invalid `WifiMacHeader` at `wifi-txop-test.cc:1427`, a SIGSEGV without sanitizers). The suites test 802.11ax/be machinery (EMLSR, MLO, groupcast, TXOP limits) that 802.11a/b ad-hoc MANET work does not use. | cause not yet classified (module dependency vs ns-3 test bug); an on-demand 3.48 build fails the `unit` stage until it is; [#49](https://github.com/swarm-routing/sim-containers/issues/49) |
 
 Corrections that came out of the tests:
 

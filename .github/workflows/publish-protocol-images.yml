@@ -221,7 +221,7 @@ jobs:
           for name in ("swarm-core", "routing-bench"):
               k = name.replace("-", "_")
               line = f"{name}={e[k + '_spec']} {e[k + '_commit']} /opt/swarm-modules/{name}"
-              if not re.search("^" + re.escape(line) + '"?$', env, re.M):
+              if not re.search('^(SWARM_PREBUILT=")?' + re.escape(line) + '"?$', env, re.M):
                   bad.append(f".swarm-modules.env has no line {line!r}")
           if f'SWARM_BASE_IMAGE="{e["base_image"]}"' not in env:
               bad.append(".swarm-modules.env names another base image")

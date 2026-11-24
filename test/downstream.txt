@@ -27,8 +27,9 @@
 #
 # ns3-tools runs its stock-arm delivery check without `aodv`: ns-3.49's stock
 # AODV livelocks (ns3-containers#35, AntHocNet#843); put it back when a fixed
-# release is the supported one. AntHocNet runs the suites and the example its
-# own `latest` leg runs (its AODV-family gates are on 3.48 for the same reason).
+# release is the supported one. AntHocNet ships `ci/canary.sh`: it runs this
+# line's stage, modules, suites and run, then the behaviour gates a release
+# can move (arm-delivery and its anchors, AntHocNet#1222; ~25 min).
 
 ns3-swarm-core | swarm-routing/ns3-swarm-core@main | 3.42+ | swarm-core=ns3-swarm-core | | |
 ns3-tools | swarm-routing/ns3-tools@main | 3.42+ | routing-bench=ns3-tools/ns3/routing-bench | | | bash tools/checks/check-stock-arms.sh /opt/ns-3 "olsr dsdv hwmp"

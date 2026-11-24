@@ -291,7 +291,9 @@ the new ubuntu `debug` candidate by `test/downstream.sh <image>`: today all
 seven lines are built and tested: `ns3-swarm-core` (`swarm-core`), `ns3-tools`
 (`routing-bench` + its stock-arm delivery check, without `aodv` while #35
 lasts), AntHocNet (its seven modules, swarm-core included, staged by
-`make install-ns3`, its suites and `anthocnet-example`), and ARA, BeeAdHoc, Termite and HOPNET (each
+`make install-ns3`, its suites and `anthocnet-example`, then, through its
+`ci/canary.sh`, the behaviour gates a release can move: the arm-delivery
+smoke and its validation anchors, AntHocNet#1222), and ARA, BeeAdHoc, Termite and HOPNET (each
 protocol's `ns3/` module on `swarm-core`, its own suite). A line whose module
 directory does not exist yet is skipped with the reason, so a repository can
 be listed before it has an `ns3/` module. Each consumer runs in a fresh container

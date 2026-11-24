@@ -114,10 +114,23 @@ in_image() {
         "$image" "$@"
 }
 
-# OCI labels, read from the image config on the runner (ns3-containers#39).
+# OCI labels, read from the image config on the runner (ns3-containers#39);
+# then, for an image addressed by digest in a registry (the pipeline's
+# candidate), the index annotations the build sets from the same values: the
+# registry's package page reads them, and promote copies the index as it is.
 labels() {
-    local fails=0 key want got
-    for pair in "org.opencontainers.image.source=https://github.com/swarm-routing/ns3-containers" \
+    local fails=0 key want got repo="https://github.com/swarm-routing/sim-containers"
+    local title="" description="" raw
+    if [ -n "${EXPECT_VERSION:-}" ] && [ -n "${EXPECT_PROFILE:-}" ] && [ -n "${EXPECT_OS:-}" ]; then
+        title="ns3-dev ${EXPECT_VERSION} ${EXPECT_PROFILE} (${EXPECT_OS})"
+        description="ns-3 ${EXPECT_VERSION} ${EXPECT_PROFILE} profile on ${EXPECT_OS}: a warm Ninja build for swarm-routing contrib modules"
+    fi
+    for pair in "org.opencontainers.image.source=$repo" \
+                "org.opencontainers.image.url=$repo" \
+                "org.opencontainers.image.documentation=$repo#which-image" \
+                "org.opencontainers.image.vendor=swarm-routing" \
+                "org.opencontainers.image.title=$title" \
+                "org.opencontainers.image.description=$description" \
                 "org.opencontainers.image.licenses=GPL-2.0-only" \
                 "org.opencontainers.image.version=${EXPECT_VERSION:-}" \
                 "io.github.swarm-routing.ns3.profile=${EXPECT_PROFILE:-}" \
@@ -132,6 +145,21 @@ labels() {
             echo "  ok    $key=$got"
         else
             echo "  FAIL  $key='$got', expected '$want'" >&2; fails=$((fails + 1))
+        fi
+    done
+    case "$image" in
+        *@sha256:*) ;;
+        *) echo "  SKIP  index annotations (a local image, not a registry digest)"; [ "$fails" -eq 0 ]; return ;;
+    esac
+    raw=$(docker buildx imagetools inspect --raw "$image") || { echo "  FAIL  cannot read the manifest of $image" >&2; return 1; }
+    for key in title description source url documentation vendor version licenses; do
+        key="org.opencontainers.image.$key"
+        want=$(docker image inspect --format "{{ index .Config.Labels \"$key\" }}" "$image")
+        got=$(KEY="$key" python3 -c 'import json,os,sys; m=json.load(sys.stdin); print((m.get("annotations") or {}).get(os.environ["KEY"], "") if "manifests" in m else "<not an index>")' <<<"$raw")
+        if [ -n "$want" ] && [ "$got" = "$want" ]; then
+            echo "  ok    index annotation $key=$got"
+        else
+            echo "  FAIL  index annotation $key='$got', expected the label '$want'" >&2; fails=$((fails + 1))
         fi
     done
     [ "$fails" -eq 0 ]

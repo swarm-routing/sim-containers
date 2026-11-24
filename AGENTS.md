@@ -15,25 +15,31 @@ history (`tools/ns3_matrix.py`; bases and tags: README "Which image"). Profiles:
 `debug` (CI default), `sanitized` (ASan+LSan+UBSan), `optimized` (ns-3
 `-d release`, campaigns only). Bases: Ubuntu 24.04 (default), Debian 13,
 Debian 13 slim, Alpine (experimental). `ns3-build-contrib` links mounted
-modules into the tree and builds them.
+modules into the tree and builds them. A second image,
+`ghcr.io/swarm-routing/ns3-protocol-dev` (debug, sanitized), is ns3-dev with
+swarm-core and routing-bench prebuilt at their newest releases, so protocol
+CI compiles only its own module (README "The protocol-CI image").
 
 ```
 docker/Dockerfile                 the image: BASE_IMAGE x NS3_VERSION x BUILD_PROFILE
 docker/scripts/build-contrib.sh   ns3-build-contrib (strict warnings, coverage, quality modules)
+docker/protocol/Dockerfile        ns3-protocol-dev: ns3-dev by digest + swarm-core and routing-bench prebuilt (.swarm-modules.env)
 docker/gcovr-requirements.{in,txt}   gcovr's pin and hashed lock (debug/sanitized images)
 tools/ns3_matrix.py               supported vs on-demand releases, base digests, tags, PR representatives
 tools/pr_tests.py                 which images and stages a PR tests (the `select` job)
 tools/pass_markers.py             promote's check: every test job passed, on one digest
 tools/cache_tags.py               which ns3-dev-cache tags the daily cleanup deletes (rule 14)
+tools/protocol_images.py          ns3-protocol-dev's inputs (ns3-dev latest-* digest, newest module releases), tags, build-or-skip
 tools/release/dist.sh             the release asset: the pipeline's source tarball, checked (`make dist`)
 .cz.toml, CITATION.cff            Commitizen config and the version it bumps; releases run through release.yml (the org reusable-release.yml)
 test/run.sh                       every test stage against one image ref (`--stages`, `--unit-shard`)
 test/{structure,profile,smoke,integration,unit}.sh   the stages: image contract, profile promise, smoke, simulation, ns-3 unit suites
+test/protocol.sh                  the protocol stage: ns3-protocol-dev's record and warm build (SKIP on ns3-dev)
 test/ns3-suites.txt, test/known-failures.txt   unit suites per profile (split, main-only), expected upstream failures
 test/downstream.{sh,txt}          the downstream canary (a wrapper of swarm-routing/.github tools/downstream/downstream.sh, swarm-routing/.github#482) and the org modules it builds (gates latest-*)
-test/fixtures/                    swarm-hello (smoke), manet-canary (integration), profile-probe (profile); GPL-2.0-only
+test/fixtures/                    swarm-hello (smoke), manet-canary (integration), profile-probe (profile), protocol-hello (protocol); GPL-2.0-only
 .trivyignore, .hadolint.yaml      accepted Dockerfile findings; hadolint settings
-.github/workflows/                publish-images.yml (build, test by digest, promote, sign; `images gate`), container-security.yml,
+.github/workflows/                publish-images.yml (build, test by digest, promote, sign; `images gate`), publish-protocol-images.yml (ns3-protocol-dev), container-security.yml,
                                   os-refresh.yml (daily scan, dispatches publish-images' `refresh`, #218),
                                   pr-title.yml, release.yml, candidates-cleanup.yml, licence.yml, sync-labels.yml; org-managed: org-sync.yml,
                                   review-gate.yml, dco.yml, scorecard.yml; .github/ISSUE_TEMPLATE/ (+ image-request.yml)
@@ -386,6 +392,7 @@ chat, not the record.
 | Change what a release gets, a base image digest, or add a profile | `tools/ns3_matrix.py` (+ its test) and the `Dockerfile` profile `case` |
 | Handle an image request (another distro, compiler, version) | the *Image request* form's issue; supported set and its reasons in README "Need another distribution…" and #19. The org's forms in `.github/ISSUE_TEMPLATE/` are org-sync items (`forms = true`; swarm-routing/.github#318) |
 | Add a stock ns-3 module to the images | `NS3_MODULES` in `docker/Dockerfile` (every downstream repo inherits it) |
+| Change the protocol-CI image (which modules are prebuilt, its tags or triggers) | `docker/protocol/Dockerfile`, `tools/protocol_images.py` (+ its test), `test/protocol.sh`, `publish-protocol-images.yml`; consumers opt in with `reusable-ns3-ci.yml`'s `protocol-image` |
 | Change how contrib modules build | `docker/scripts/build-contrib.sh` (+ `test/smoke.sh`) |
 | The reference image this was derived from | AntHocNet `docker/Dockerfile.ns3`, `.github/workflows/images.yml` |
 | The org's invariants, labels, issue shape | [`swarm-routing/.github` CONTRIBUTING.md](https://github.com/swarm-routing/.github/blob/main/CONTRIBUTING.md) |

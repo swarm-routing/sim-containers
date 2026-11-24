@@ -7,7 +7,9 @@
 #   test/run.sh [--stages a,b,...] [--unit-shard i/N] <image-ref>
 #
 # With no option it runs every stage, in order: labels, security, structure,
-# profile, smoke, integration, unit. That is what local runs, fork PRs and
+# profile, smoke, integration, unit, protocol. `protocol` (test/protocol.sh)
+# checks an ns3-protocol-dev image (publish-protocol-images.yml) and says SKIP
+# on an ns3-dev image. That is what local runs, fork PRs and
 # on-demand builds do. --stages runs only the named ones (same order);
 # --unit-shard i/N makes the unit stage run shard i of N of its group, as
 # listed in test/ns3-suites.txt (ns3-containers#86). The pipeline splits an
@@ -42,7 +44,7 @@
 # cannot apply to a release says SKIP (<reason>); it never passes silently.
 set -euo pipefail
 
-all_stages="labels security structure profile smoke integration unit"
+all_stages="labels security structure profile smoke integration unit protocol"
 usage() { echo "usage: $0 [--stages a,b,...] [--unit-shard i/N] <image-ref>" >&2; exit 2; }
 stages=$all_stages
 unit_shard=""

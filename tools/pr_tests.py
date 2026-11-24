@@ -82,6 +82,9 @@ TEST_INPUTS = [
     (r"\.trivyignore", ("security",)),
     (r"tools/(ns3_matrix|pass_markers|pr_tests)\.py", ALL),
     (r"\.github/workflows/publish-images\.yml", ALL),
+    # The protocol stage applies to ns3-protocol-dev only (SKIP on ns3-dev):
+    # publish-protocol-images.yml tests its inputs, no ns3-dev stage reruns.
+    (r"test/(protocol\.sh|fixtures/protocol-hello/.*)", ()),
     (r"test/.*", ALL),
 ]
 

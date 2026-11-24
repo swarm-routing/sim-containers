@@ -14,6 +14,7 @@
 | `test/fixtures/` | the test fixtures: an ns-3 contrib module and an ns-3 program | `GPL-2.0-only` |
 | `test/fixtures/swarm-hello/` | the smoke stage's ns-3 contrib module | `GPL-2.0-only` |
 | `test/fixtures/manet-canary/` | the integration stage's MANET program (public ns-3 APIs only) | `GPL-2.0-only` |
+| `test/fixtures/protocol-hello/` | the protocol stage's ns-3 contrib module (on swarm-core and routing-bench) | `GPL-2.0-only` |
 | `test/fixtures/profile-probe/` | the profile stage's probe program (public ns-3 APIs only) | `GPL-2.0-only` |
 | `test/known-failures.txt`, `test/ns3-suites.txt`, `test/downstream.txt` | test data: expected upstream failures, the unit stage's module list, the downstream canary's consumers | `GPL-2.0-only` |
 | `README.md`, `AGENTS.md`, `CLAUDE.md` | docs | `GPL-2.0-only` |

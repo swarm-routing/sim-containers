@@ -132,7 +132,11 @@ resolves (ns3-dev `latest-*` by digest, each module's highest `vX.Y.Z` tag
 and its commit), after every successful *Publish images* run on main and
 daily, and only when an input changed; it is tested by digest
 (`test/run.sh`, every stage but `labels` and `unit`, `protocol` included) before it is
-tagged.
+tagged. It inherits ns3-dev's `unit` verdict: its stock ns-3 libraries are
+the base ns3-dev image's files, unrebuilt, which its `protocol` stage proves
+(golden rule 17's one exception; maintainer decision 2026-11-24, #256). The
+package name and the tag scheme above are kept as built (maintainer decision
+2026-11-24, #256).
 
 ## Need another distribution, version or compiler?
 

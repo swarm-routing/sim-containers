@@ -1,3 +1,17 @@
+## v1.1.0 (2026-11-25)
+
+### Feat
+
+- **images**: ns3-protocol-dev, ns3-dev with swarm-core and routing-bench prebuilt (#257)
+
+### Fix
+
+- follow the rename to sim-containers in the cosign identity, links and release asset (#262)
+- **images**: describe each ns3-dev image in its labels and index annotations (#255)
+- **test**: stop the smoke's deprecated-warning check failing on SIGPIPE (#244)
+- **image**: retry the apt package downloads, not only the index update (#241)
+- **contrib**: a deprecation stays a warning under --strict-warnings (#167) (#168)
+
 ## v1.0.0 (2026-11-13)
 
 ### Feat

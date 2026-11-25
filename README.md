@@ -132,7 +132,11 @@ resolves (ns3-dev `latest-*` by digest, each module's highest `vX.Y.Z` tag
 and its commit), after every successful *Publish images* run on main and
 daily, and only when an input changed; it is tested by digest
 (`test/run.sh`, every stage but `labels` and `unit`, `protocol` included) before it is
-tagged.
+tagged. It inherits ns3-dev's `unit` verdict: its stock ns-3 libraries are
+the base ns3-dev image's files, unrebuilt, which its `protocol` stage proves
+(golden rule 17's one exception; maintainer decision 2026-11-24, #256). The
+package name and the tag scheme above are kept as built (maintainer decision
+2026-11-24, #256).
 
 ## Need another distribution, version or compiler?
 
@@ -338,7 +342,9 @@ the new ubuntu `debug` candidate by `test/downstream.sh <image>`: today all
 seven lines are built and tested: `ns3-swarm-core` (`swarm-core`), `ns3-tools`
 (`routing-bench` + its stock-arm delivery check, without `aodv` while #35
 lasts), AntHocNet (its seven modules, swarm-core included, staged by
-`make install-ns3`, its suites and `anthocnet-example`), and ARA, BeeAdHoc, Termite and HOPNET (each
+`make install-ns3`, its suites and `anthocnet-example`, then, through its
+`ci/canary.sh`, the behaviour gates a release can move: the arm-delivery
+smoke and its validation anchors, AntHocNet#1222), and ARA, BeeAdHoc, Termite and HOPNET (each
 protocol's `ns3/` module on `swarm-core`, its own suite). A line whose module
 directory does not exist yet is skipped with the reason, so a repository can
 be listed before it has an `ns3/` module. Each consumer runs in a fresh container

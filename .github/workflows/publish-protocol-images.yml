@@ -236,13 +236,15 @@ jobs:
           EXPECT_VERSION: ${{ matrix.ns3 }}
           EXPECT_PROFILE: ${{ matrix.profile }}
           EXPECT_OS: ubuntu
+          # Built on the stock ns3-dev image: the patches stage proves it carries no patch (docs/adr/0002).
+          EXPECT_VARIANT: stock
         # `labels` is ns3-dev's own label contract (this image overrides its
         # title, description and revision); the record step above checks this
         # image's. `unit` runs ns-3's own suites on the stock libraries, which
         # this image does not rebuild (the protocol stage checks that no
         # stock library is newer than the record): Publish images ran them,
         # on these files, before it promoted the base.
-        run: test/run.sh --stages security,structure,profile,smoke,integration,protocol "$REF"
+        run: test/run.sh --stages security,structure,profile,smoke,integration,patches,protocol "$REF"
       - name: Install cosign
         if: env.WRITE_REGISTRY == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3

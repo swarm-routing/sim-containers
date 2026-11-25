@@ -137,6 +137,7 @@ class Plan(unittest.TestCase):
         self.assertEqual(ran, {
             "3.49-debug": ["labels,smoke"], "3.49-optimized": ["labels,smoke"],
             "3.49-sanitized": ["labels,smoke"],  # the base part only: no unit job
+            "3.49-sanitized-patched": ["labels,smoke"],
             "3.49-debian-debug": ["labels,smoke"], "3.49-slim-default": ["labels,smoke"],
             "3.49-alpine-debug": ["labels,smoke"]})
 
@@ -174,8 +175,8 @@ class Select(unittest.TestCase):
         self.put("3.49-debug", "candidate", oci(layers=("sha256:changed",)))  # the Dockerfile changed debug
         tests, lines = pt.select(imgs, self.dir, changed([]))
         self.assertEqual([t["test_name"] for t in tests], ["3.49-debug"])
-        self.assertEqual(len(lines), 9)
-        self.assertEqual(sum("unchanged digest, already tested on main" in ln for ln in lines), 8)
+        self.assertEqual(len(lines), 11)
+        self.assertEqual(sum("unchanged digest, already tested on main" in ln for ln in lines), 10)
         self.assertNotIn("test_parts", tests[0])
 
     def test_missing_files_run_everything(self):

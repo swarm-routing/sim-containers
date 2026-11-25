@@ -57,8 +57,8 @@ class Supported(unittest.TestCase):
 
     def test_only_the_latest_release(self):
         self.assertEqual({e["version"] for e in self.mx}, {"3.49"})
-        # 4 ubuntu + 2 debian + 2 slim + 1 alpine
-        self.assertEqual(len(self.mx), 9)
+        # 4 ubuntu + 2 debian + 2 slim + 1 alpine + 2 patched (ubuntu debug, sanitized)
+        self.assertEqual(len(self.mx), 11)
         alpine = [e for e in self.mx if e["os"] == "alpine"]
         self.assertEqual([(e["profile"], e["experimental"]) for e in alpine], [("debug", True)])
         self.assertFalse(any(e["experimental"] for e in self.mx if e["os"] != "alpine"))
@@ -73,8 +73,8 @@ class Supported(unittest.TestCase):
                 self.assertEqual(e["os"], "ubuntu")
 
     def test_tags(self):
-        def tags(os_, profile):
-            (e,) = [e for e in self.mx if (e["os"], e["profile"]) == (os_, profile)]
+        def tags(os_, profile, variant="stock"):
+            (e,) = [e for e in self.mx if (e["os"], e["profile"], e["variant"]) == (os_, profile, variant)]
             return e["tags"].split(), e["latest_tags"].split()
         self.assertEqual(tags("ubuntu", "default"),
                          (["3.49-default", "3.49", "3.49-default-290685f", "3.49-290685f"],
@@ -84,6 +84,30 @@ class Supported(unittest.TestCase):
         self.assertEqual(tags("slim", "default"),
                          (["3.49-slim-default", "3.49-slim", "3.49-slim-default-290685f", "3.49-slim-290685f"],
                           ["latest-slim-default", "latest-slim"]))
+        self.assertEqual(tags("ubuntu", "sanitized", "patched"),
+                         (["3.49-sanitized-patched", "3.49-sanitized-patched-290685f"],
+                          ["latest-sanitized-patched"]))
+
+    def test_patched_variant(self):
+        # docs/adr/0002: beside the stock images, never under a stock tag.
+        patched = [e for e in self.mx if e["variant"] == "patched"]
+        self.assertEqual(sorted(e["name"] for e in patched), ["3.49-debug-patched", "3.49-sanitized-patched"])
+        stock_tags = {t for e in self.mx if e["variant"] == "stock" for t in (e["tags"] + " " + e["latest_tags"]).split()}
+        for e in patched:
+            self.assertEqual(e["patches"], " ".join(m.PATCHES))
+            self.assertRegex(e["sim_tools_commit"], r"^[0-9a-f]{40}$")
+            self.assertTrue(e["cache"].endswith("-patched"), e["cache"])
+            for t in (e["tags"] + " " + e["latest_tags"]).split():
+                self.assertIn("-patched", t)
+                self.assertNotIn(t, stock_tags)
+        for e in self.mx:
+            if e["variant"] == "stock":
+                self.assertEqual((e["patches"], e["sim_tools_commit"]), ("", ""), e["name"])
+        self.assertEqual(len({e["name"] for e in self.mx}), len(self.mx))
+        self.assertEqual(len({e["cache"] for e in self.mx}), len(self.mx))
+
+    def test_on_demand_release_has_no_patched_variant(self):
+        self.assertFalse(any(e["variant"] == "patched" for e in run(LS_REMOTE, "--versions", "3.48")))
 
     def test_entries_carry_build_inputs(self):
         for e in self.mx:
@@ -94,8 +118,8 @@ class Supported(unittest.TestCase):
     def test_pr_unit_set(self):
         # #87: on PRs the OS variants run the light unit group; Ubuntu keeps its profile's group.
         got = {e["name"]: e["pr_unit_set"] for e in self.mx}
-        for name, unit_set in got.items():
-            self.assertEqual(unit_set, "" if name.count("-") == 1 else "light", name)
+        for e in self.mx:
+            self.assertEqual(e["pr_unit_set"], "" if e["os"] == "ubuntu" else "light", e["name"])
         self.assertEqual(got["3.49-sanitized"], "")
         self.assertEqual(got["3.49-debug"], "")
         self.assertEqual(got["3.49-debian-debug"], "light")
@@ -105,7 +129,8 @@ class Supported(unittest.TestCase):
         # tools/pr_tests.py: a PR that changes only test stages runs them on these.
         reps = sorted(e["name"] for e in self.mx if e["representative"])
         self.assertEqual(reps, ["3.49-alpine-debug", "3.49-debian-debug", "3.49-debug",
-                                "3.49-optimized", "3.49-sanitized", "3.49-slim-default"])
+                                "3.49-optimized", "3.49-sanitized", "3.49-sanitized-patched",
+                                "3.49-slim-default"])
         # Every base and every profile of the plan has one; one per base but Ubuntu.
         self.assertEqual({e["os"] for e in self.mx if e["representative"]}, {e["os"] for e in self.mx})
         self.assertEqual({e["profile"] for e in self.mx if e["representative"]},
@@ -136,7 +161,7 @@ class OnDemand(unittest.TestCase):
         self.assertEqual({e["version"] for e in mx}, {"3.46.1", "3.42"})
 
     def test_supported_release_on_demand_gets_its_full_set(self):
-        self.assertEqual(len(run(LS_REMOTE, "--versions", "3.49")), 9)
+        self.assertEqual(len(run(LS_REMOTE, "--versions", "3.49")), 11)
 
     def test_unknown_version_refused(self):
         with self.assertRaises(SystemExit):
@@ -152,7 +177,7 @@ class TierLatest(unittest.TestCase):
 
     def test_only_supported_entries_with_latest_tags(self):
         mx = run(LS_REMOTE, "--tier", "latest")
-        self.assertEqual(len(mx), 9)
+        self.assertEqual(len(mx), 11)
         self.assertEqual({e["version"] for e in mx}, {"3.49"})
         self.assertTrue(all(e["latest_tags"] for e in mx))
 
@@ -160,7 +185,7 @@ class TierLatest(unittest.TestCase):
         # The scanner (#30) dispatches refresh with versions=<that version>.
         for v in ("3.49", "3.49,3.49"):
             mx = run(LS_REMOTE, "--tier", "latest", "--versions", v)
-            self.assertEqual(len(mx), 9)
+            self.assertEqual(len(mx), 11)
 
     def test_refuses_an_older_release(self):
         # Invariant 16: a refresh never rebuilds history as a side effect.
@@ -255,7 +280,8 @@ class UnitShards(unittest.TestCase):
         mx = run(LS_REMOTE, "--sha", "290685fdeadbeef")
         tm = m.test_matrix(mx)
         n = m.read_suites()[1].get("sanitized", 0)
-        self.assertEqual(len(tm), len(mx) + n)
+        # every sanitized image (stock and patched) is split into a base part and n unit parts
+        self.assertEqual(len(tm), len(mx) + n * sum(e["profile"] == "sanitized" for e in mx))
         names = [t["test_name"] for t in tm]
         self.assertEqual(len(names), len(set(names)))
         self.assertTrue(all("test_parts" not in t for t in tm))
@@ -267,7 +293,8 @@ class MissingOnly(unittest.TestCase):
     """--missing-only with a fake registry: no network (#149)."""
 
     REQUIRED = {"3.49-default", "3.49-debug", "3.49-sanitized", "3.49-optimized",
-                "3.49-debian-default", "3.49-debian-debug", "3.49-slim-default", "3.49-slim-debug"}
+                "3.49-debian-default", "3.49-debian-debug", "3.49-slim-default", "3.49-slim-debug",
+                "3.49-debug-patched", "3.49-sanitized-patched"}
 
     def missing_only(self, have, *args):
         asked = []
@@ -289,13 +316,13 @@ class MissingOnly(unittest.TestCase):
 
     def test_nothing_published(self):
         mx, _ = self.missing_only(set())
-        self.assertEqual(len(mx), 9)
+        self.assertEqual(len(mx), 11)
 
     def test_plain_tag_published_but_a_required_image_absent(self):
         # Run 50 (#64): :3.49 was promoted, the Debian and slim legs failed.
         have = (self.REQUIRED | {"3.49"}) - {"3.49-debian-debug"}
         mx, _ = self.missing_only(have)
-        self.assertEqual(len(mx), 9)  # the whole release is rebuilt, not one image
+        self.assertEqual(len(mx), 11)  # the whole release is rebuilt, not one image
         self.assertEqual({e["version"] for e in mx}, {"3.49"})
 
     def test_every_required_image_published(self):

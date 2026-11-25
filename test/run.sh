@@ -7,7 +7,9 @@
 #   test/run.sh [--stages a,b,...] [--unit-shard i/N] <image-ref>
 #
 # With no option it runs every stage, in order: labels, security, structure,
-# profile, smoke, integration, unit, protocol. `protocol` (test/protocol.sh)
+# profile, smoke, integration, patches, unit, protocol. `patches`
+# (test/patches.sh) proves a patched image's record and patches and that a
+# stock image carries none (docs/adr/0002-patched-image-variant.md). `protocol` (test/protocol.sh)
 # checks an ns3-protocol-dev image (publish-protocol-images.yml) and says SKIP
 # on an ns3-dev image. That is what local runs, fork PRs and
 # on-demand builds do. --stages runs only the named ones (same order);
@@ -27,7 +29,9 @@
 # EXPECT_VERSION, EXPECT_PROFILE, EXPECT_OS (the pipeline's matrix entry),
 # EXPECT_REVISION (the commit that built it) and EXPECT_BUILD_RUN (the run)
 # are passed to the stages that compare against them; unset, those
-# comparisons are skipped and say so.
+# comparisons are skipped and say so. So are EXPECT_VARIANT (stock|patched),
+# EXPECT_PATCHES and EXPECT_SIM_TOOLS_COMMIT (the matrix entry's `variant`,
+# `patches` and `sim_tools_commit`; empty on a stock entry).
 #
 # UNIT_SET=full|light picks the unit stage's group in test/ns3-suites.txt;
 # unset (a local run, a push to main, a schedule or dispatch run), the
@@ -44,7 +48,7 @@
 # cannot apply to a release says SKIP (<reason>); it never passes silently.
 set -euo pipefail
 
-all_stages="labels security structure profile smoke integration unit protocol"
+all_stages="labels security structure profile smoke integration patches unit protocol"
 usage() { echo "usage: $0 [--stages a,b,...] [--unit-shard i/N] <image-ref>" >&2; exit 2; }
 stages=$all_stages
 unit_shard=""
@@ -113,6 +117,8 @@ in_image() {
     docker run --rm -v "$repo:/src:ro" \
         -e EXPECT_VERSION="${EXPECT_VERSION:-}" -e EXPECT_PROFILE="${EXPECT_PROFILE:-}" \
         -e EXPECT_OS="${EXPECT_OS:-}" -e UNIT_SET="${UNIT_SET:-}" -e UNIT_SHARD="$unit_shard" -e UNIT_PR="${UNIT_PR:-}" \
+        -e EXPECT_VARIANT="${EXPECT_VARIANT:-}" -e EXPECT_PATCHES="${EXPECT_PATCHES:-}" \
+        -e EXPECT_SIM_TOOLS_COMMIT="${EXPECT_SIM_TOOLS_COMMIT:-}" \
         "$image" "$@"
 }
 
@@ -122,10 +128,15 @@ in_image() {
 # registry's package page reads them, and promote copies the index as it is.
 labels() {
     local fails=0 key want got repo="https://github.com/swarm-routing/sim-containers"
-    local title="" description="" raw
+    local title="" description="" raw patches="" commit=""
+    local p=${EXPECT_PATCHES:-}
     if [ -n "${EXPECT_VERSION:-}" ] && [ -n "${EXPECT_PROFILE:-}" ] && [ -n "${EXPECT_OS:-}" ]; then
-        title="ns3-dev ${EXPECT_VERSION} ${EXPECT_PROFILE} (${EXPECT_OS})"
-        description="ns-3 ${EXPECT_VERSION} ${EXPECT_PROFILE} profile on ${EXPECT_OS}: a warm Ninja build for swarm-routing contrib modules"
+        title="ns3-dev ${EXPECT_VERSION} ${EXPECT_PROFILE}${p:+-patched} (${EXPECT_OS})"
+        description="ns-3 ${EXPECT_VERSION} ${EXPECT_PROFILE} profile on ${EXPECT_OS}${p:+, patched ($p)}: a warm Ninja build for swarm-routing contrib modules"
+    fi
+    # docs/adr/0002: `none` on a stock image, the patch set and sim-tools commit on a patched one.
+    if [ -n "${EXPECT_VARIANT:-}" ]; then
+        patches=${p:-none}; commit=${EXPECT_SIM_TOOLS_COMMIT:-none}
     fi
     for pair in "org.opencontainers.image.source=$repo" \
                 "org.opencontainers.image.url=$repo" \
@@ -137,6 +148,8 @@ labels() {
                 "org.opencontainers.image.version=${EXPECT_VERSION:-}" \
                 "io.github.swarm-routing.ns3.profile=${EXPECT_PROFILE:-}" \
                 "io.github.swarm-routing.ns3.base=${EXPECT_OS:-}" \
+                "io.github.swarm-routing.ns3.patches=$patches" \
+                "io.github.swarm-routing.sim-tools.commit=$commit" \
                 "org.opencontainers.image.revision=${EXPECT_REVISION:-}" \
                 "io.github.swarm-routing.build-run=${EXPECT_BUILD_RUN:-}"; do
         key=${pair%%=*}; want=${pair#*=}

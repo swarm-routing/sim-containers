@@ -38,6 +38,7 @@ failed refresh opens an issue here.
 | the supported release (3.49 today) | Ubuntu 24.04 | `default`, `debug`, `sanitized`, `optimized` |
 | the supported release | Debian 13, Debian 13 slim | `default`, `debug` |
 | the supported release | Alpine 3.24 — **experimental**, may be missing | `debug` |
+| the supported release, **patched** ([below](#the-patched-variant)) | Ubuntu 24.04 | `debug`, `sanitized` |
 | any older release, **on demand** | Ubuntu 24.04 | `default`, `debug` |
 
 **Older releases are history.** 3.40–3.48 were published once, on 2026-11-01,
@@ -65,10 +66,48 @@ with SIGILL on another CPU.
 | `:3.49`, `:3.49-debug` (`-default`, `-sanitized`, `-optimized`) | Ubuntu, that release and profile |
 | `:3.49-debian-debug`, `:3.49-slim` (`= -slim-default`) | other bases |
 | `:3.46-debug` and `:3.46.1-debug` | a patch release is tagged under both numbers |
+| `:latest-debug-patched`, `:latest-sanitized-patched`, `:3.49-debug-patched`, `:3.49-sanitized-patched` | the [patched variant](#the-patched-variant): Ubuntu, sim-tools' self-detecting ns-3 patches applied |
 | any versioned tag + `-<sha7>` | immutable: the sim-containers commit that built it |
 
 CI that should track ns-3 uses `latest-debug` / `latest-sanitized`; anything
 that produces a published number pins a versioned `-<sha7>` tag.
+
+### The patched variant
+
+Beside the stock images, which stay stock and available for comparison, the
+supported release's Ubuntu `debug` and `sanitized` images also come
+**patched**: the same build, with the self-detecting ns-3 patches of
+[swarm-routing/sim-tools](https://github.com/swarm-routing/sim-tools)
+`ns3/patches/` applied to the source before configure
+([ADR-0002](docs/adr/0002-patched-image-variant.md); sim-tools ADR-0002,
+[swarm-routing/sim-tools#381](https://github.com/swarm-routing/sim-tools/issues/381)).
+Each patch's `apply.sh` decides from the source (applies where the bug is,
+skips where it is fixed or already patched, fails the build where the bug is
+there but the patch does not fit), so the variant never carries a patch for
+a bug its tree does not have.
+
+| Patch | Bug | Since |
+|---|---|---|
+| NS3-005 | AODV route lifetime overflow: a route that never expires plus `Now()` overflows `int64` when an interface comes up after t=0 (UBSan aborts the run) ([swarm-routing/sim-tools#374](https://github.com/swarm-routing/sim-tools/issues/374)) | sim-tools `1b36c739` |
+
+What it carries, readable without running it:
+
+- labels `io.github.swarm-routing.ns3.patches` (the patch set, e.g. `NS3-005`;
+  `none` on a stock image) and `io.github.swarm-routing.sim-tools.commit`
+  (the full sim-tools commit the patches came from, pinned in
+  `tools/ns3_matrix.py`; `none` on a stock image); the title and description
+  say `patched`;
+- `/opt/ns-3/.swarm-patches`: the patch set, the sim-tools repository and
+  commit, which patches applied and which skipped, and each `apply.sh` line;
+- `/usr/local/share/ns3-patches/<ID>/`: each patch as fetched (the patch,
+  `apply.sh`, the reproducer).
+
+The `patches` test stage proves it on every build (the reproducer runs clean
+under the sanitizers, and `apply.sh` finds the tree already patched) and
+proves that every stock image carries no patch. Use the patched variant
+where a patched bug would stop a run (e.g. a sanitized AODV campaign hitting
+NS3-005); use the stock tags to compare against upstream ns-3. Pin a
+`-patched-<sha7>` tag in anything that produces a published number.
 
 CI tools: the `debug` and `sanitized` images carry `gcovr` (pinned, see
 `--coverage` below); `debug` also carries `unzip`, `curl` and `gnupg`, which
@@ -219,17 +258,20 @@ test/run.sh --stages structure,smoke ns3-dev:3.48-debug   # some of them (see "S
 `test/run.sh <image>` runs every test stage against one image: `labels` on
 the host from the image config, every other stage in a fresh container with
 this repository mounted read-only (pass `EXPECT_VERSION`, `EXPECT_PROFILE`,
-`EXPECT_OS`, `EXPECT_REVISION` to compare against what the image should be; CI
-passes its matrix entry and commit):
+`EXPECT_OS`, `EXPECT_VARIANT`, `EXPECT_PATCHES`, `EXPECT_SIM_TOOLS_COMMIT`,
+`EXPECT_REVISION` to compare against what the image should be; CI passes its
+matrix entry and commit):
 
 | Stage | Checks |
 |---|---|
-| `labels` | the OCI labels: source, url, documentation, vendor, licence, ns-3 version, profile, base, title and description (both naming the ns-3 version, profile and base, e.g. `ns3-dev 3.49 debug (ubuntu)`), revision, build run; for a candidate addressed by digest, the index annotations too (title, description, source, url, documentation, vendor, version, licence: equal to the labels), which the registry's package page shows and promote copies unchanged |
+| `labels` | the OCI labels: source, url, documentation, vendor, licence, ns-3 version, profile, base, title and description (both naming the ns-3 version, profile and base, e.g. `ns3-dev 3.49 debug (ubuntu)`, and `patched` on the [patched variant](#the-patched-variant)), the patch set and sim-tools commit (`none` on a stock image), revision, build run; for a candidate addressed by digest, the index annotations too (title, description, source, url, documentation, vendor, version, licence: equal to the labels), which the registry's package page shows and promote copies unchanged |
 | `structure` | `/opt/ns-3` configured and built, `ns3-build-contrib` on `PATH`, the environment, the recorded configure line and module list (equal to the Dockerfile's, every module built), the CMake cache matching the profile (build type, asserts, logs, sanitizers, no native optimizations, examples and tests on), the C++ standard the tree requires, `gcovr` at its pinned version on `debug` and `sanitized`, `unzip`, `curl` and `gpg` on `debug` |
 | `profile` | the profile does what its name says: asserts abort and `NS_LOG` prints (`default`, `debug`, `sanitized`) or both are compiled out (`optimized`); on `sanitized`, a planted use-after-free, leak and signed overflow are each reported by ASan, LSan and UBSan; no AVX/AVX-512 instruction in the stock core library (nothing built for the build machine's CPU) |
 | `smoke` | builds `test/fixtures/swarm-hello`, runs its test.py suite, fails above 40 Ninja steps (the warm cache was missed); `--strict-warnings`, `--quality-modules` and `--coverage` do what they promise, and the image's `gcovr` reports the module's coverage |
 
 | `integration` | ns-3 actually simulates: the tutorial `first`; the routing modules' own examples `aodv-example` (must deliver), `dsdv-manet` and `olsr-hna` (must deliver); and [`manet-canary`](test/fixtures/manet-canary/) (16 nodes, random waypoint) with AODV, OLSR and DSDV, dense (must deliver) and sparse (partitioned), each under a wall-clock budget: a run that does not finish is a hang |
+
+| `patches` | a stock image carries no patch (no `/opt/ns-3/.swarm-patches`, no `/usr/local/share/ns3-patches`, no NS3-005 code in AODV); a [patched](#the-patched-variant) image's record names its patch set and sim-tools commit (equal to `EXPECT_PATCHES`, `EXPECT_SIM_TOOLS_COMMIT`), each patch's `apply.sh --dry-run` finds the built tree already patched (or still skips one it skipped), and each applied patch's reproducer runs clean where it can tell (NS3-005's on `sanitized`, SKIP elsewhere); `EXPECT_VARIANT=stock\|patched` says which the image must be |
 
 | `unit` | ns-3's own QUICK unit suites (`test.py -c unit -f QUICK`) for the modules in [`test/ns3-suites.txt`](test/ns3-suites.txt): the MANET stack (core, network, internet, mobility, wifi, propagation, aodv, olsr, dsdv, mesh, the `full` group) on `debug` and `sanitized`, core/network/internet (`light`) on `default` and `optimized`; `UNIT_SET=full\|light` overrides the profile's group. Their test libraries are built in the throwaway container. Every suite's time is in the job log, the 15 slowest in the step summary |
 
@@ -390,7 +432,7 @@ evidence; this is the summary a user of the images needs.
 
 | ns-3 | What | Status |
 |---|---|---|
-| **3.49** (the supported release, `latest`) | **Stock AODV never finishes a sparse MANET run.** ns-3.49's new `Ipv4L3Protocol::SendIcmpNoRoute` (RFC 1812 ICMP "net unreachable") feeds back into AODV's deferred route output: the ICMP error has no route either, is queued through loopback into the full request queue, whose drop raises another ICMP error, all at one simulated instant (1,284,336 errors at +8.146253127 s in one run). Simulated time stops; the process spins until killed. OLSR and DSDV are unaffected; AODV-derived protocols (AntHocNet's vendored AOMDV) hang too. Reproducer, stock models only: [`manet-canary`](test/fixtures/manet-canary/) `--protocol=aodv --range=100`, which finishes in 2 s on 3.48 and never on 3.49; stock `manet-routing-compare` with its defaults does *not* trigger it. ns-3-dev `master` still has the code; reported upstream as [nsnam/ns-3-dev#1408](https://gitlab.com/nsnam/ns-3-dev/-/work_items/1408), fix proposed in [nsnam/ns-3-dev!3101](https://gitlab.com/nsnam/ns-3-dev/-/merge_requests/3101) (open, not ours). The images stay stock; the org works around it in the harness: sim-tools' `routing-bench` (v1.1.3+) installs AODV behind its `IcmpErrorGuardHelper`, which applies !3101's suppression rules ([swarm-routing/sim-tools#322](https://github.com/swarm-routing/sim-tools/pull/322)). | upstream bug, open; reproduced on every run as a strict expected failure (`test/known-failures.txt`); [#35](https://github.com/swarm-routing/sim-containers/issues/35), [AntHocNet#843](https://github.com/swarm-routing/AntHocNet/issues/843); the org's register: [NS3-001](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-bugs.md) ([root cause](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md)) |
+| **3.49** (the supported release, `latest`) | **Stock AODV never finishes a sparse MANET run.** ns-3.49's new `Ipv4L3Protocol::SendIcmpNoRoute` (RFC 1812 ICMP "net unreachable") feeds back into AODV's deferred route output: the ICMP error has no route either, is queued through loopback into the full request queue, whose drop raises another ICMP error, all at one simulated instant (1,284,336 errors at +8.146253127 s in one run). Simulated time stops; the process spins until killed. OLSR and DSDV are unaffected; AODV-derived protocols (AntHocNet's vendored AOMDV) hang too. Reproducer, stock models only: [`manet-canary`](test/fixtures/manet-canary/) `--protocol=aodv --range=100`, which finishes in 2 s on 3.48 and never on 3.49; stock `manet-routing-compare` with its defaults does *not* trigger it. ns-3-dev `master` still has the code; reported upstream as [nsnam/ns-3-dev#1408](https://gitlab.com/nsnam/ns-3-dev/-/work_items/1408), fix proposed in [nsnam/ns-3-dev!3101](https://gitlab.com/nsnam/ns-3-dev/-/merge_requests/3101) (open, not ours). No image carries a fix for it: the stock images stay stock, and the [patched variant](#the-patched-variant) applies only sim-tools' self-detecting `ns3/patches/` (NS3-005 so far, not this one; [ADR-0002](docs/adr/0002-patched-image-variant.md)). The org works around it in the harness: sim-tools' `routing-bench` (v1.1.3+) installs AODV behind its `IcmpErrorGuardHelper`, which applies !3101's suppression rules ([swarm-routing/sim-tools#322](https://github.com/swarm-routing/sim-tools/pull/322)). | upstream bug, open; reproduced on every run as a strict expected failure (`test/known-failures.txt`); [#35](https://github.com/swarm-routing/sim-containers/issues/35), [AntHocNet#843](https://github.com/swarm-routing/AntHocNet/issues/843); the org's register: [NS3-001](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-bugs.md) ([root cause](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md)) |
 | **3.48** (history, on demand) | **Four wifi unit suites fail** (`wifi-txop`, `wifi-mlo`, `wifi-gcr`, `wifi-emlsr-basic-exchanges`) with the images' 16-module set, on both profiles; they **pass** on 3.48 with every ns-3 module and on 3.49 with the images' set. With the images' set the simulation transmits fewer frames than the test expects, and the test then indexes past its frame list (UBSan: member call on an invalid `WifiMacHeader` at `wifi-txop-test.cc:1427`, a SIGSEGV without sanitizers). The suites test 802.11ax/be machinery (EMLSR, MLO, groupcast, TXOP limits) that 802.11a/b ad-hoc MANET work does not use. | cause not yet classified (module dependency vs ns-3 test bug); an on-demand 3.48 build fails the `unit` stage until it is; [#49](https://github.com/swarm-routing/sim-containers/issues/49) |
 
 Corrections that came out of the tests:

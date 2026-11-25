@@ -7,10 +7,12 @@
 #   test/run.sh [--stages a,b,...] [--unit-shard i/N] <image-ref>
 #
 # With no option it runs every stage, in order: labels, security, structure,
-# profile, smoke, integration, unit. That is what local runs, fork PRs and
+# profile, smoke, integration, unit, protocol. `protocol` (test/protocol.sh)
+# checks an ns3-protocol-dev image (publish-protocol-images.yml) and says SKIP
+# on an ns3-dev image. That is what local runs, fork PRs and
 # on-demand builds do. --stages runs only the named ones (same order);
 # --unit-shard i/N makes the unit stage run shard i of N of its group, as
-# listed in test/ns3-suites.txt (ns3-containers#86). The pipeline splits an
+# listed in test/ns3-suites.txt (sim-containers#86). The pipeline splits an
 # image's tests into parallel jobs this way, each on the same digest, and
 # promotes the digest only when every job passed; the shards of a group must
 # cover it exactly, or the unit stage fails.
@@ -18,7 +20,7 @@
 # <image-ref> is the image built in the same pipeline run, addressed by its
 # digest (ghcr.io/...@sha256:...) or, for a fork PR that cannot push, the
 # image the build step loaded locally. Never a rolling tag: what is tested is
-# what gets tagged (ns3-containers#37). Each stage runs in a fresh container
+# what gets tagged (sim-containers#37). Each stage runs in a fresh container
 # with this repository mounted read-only at /src, so no stage sees another's
 # changes and the image itself is never modified.
 #
@@ -30,19 +32,19 @@
 # UNIT_SET=full|light picks the unit stage's group in test/ns3-suites.txt;
 # unset (a local run, a push to main, a schedule or dispatch run), the
 # profile picks it (test/unit.sh). The pipeline sets it to `light` only on a
-# pull request, for the Debian, slim and Alpine images (ns3-containers#87).
+# pull request, for the Debian, slim and Alpine images (sim-containers#87).
 #
 # UNIT_PR=1 (set by the pipeline on a pull request only) makes the unit stage
 # leave out the suites on test/ns3-suites.txt's `main-only` line and say so;
 # unset, they run. Promotion happens only on main, where they always run, so
-# every published image is tested with them (ns3-containers#86, #87).
+# every published image is tested with them (sim-containers#86, #87).
 #
 # The same stages run for every image the pipeline builds: the supported
-# release and on-demand older releases alike (ns3-containers#36). A stage that
+# release and on-demand older releases alike (sim-containers#36). A stage that
 # cannot apply to a release says SKIP (<reason>); it never passes silently.
 set -euo pipefail
 
-all_stages="labels security structure profile smoke integration unit"
+all_stages="labels security structure profile smoke integration unit protocol"
 usage() { echo "usage: $0 [--stages a,b,...] [--unit-shard i/N] <image-ref>" >&2; exit 2; }
 stages=$all_stages
 unit_shard=""
@@ -114,10 +116,23 @@ in_image() {
         "$image" "$@"
 }
 
-# OCI labels, read from the image config on the runner (ns3-containers#39).
+# OCI labels, read from the image config on the runner (sim-containers#39);
+# then, for an image addressed by digest in a registry (the pipeline's
+# candidate), the index annotations the build sets from the same values: the
+# registry's package page reads them, and promote copies the index as it is.
 labels() {
-    local fails=0 key want got
-    for pair in "org.opencontainers.image.source=https://github.com/swarm-routing/ns3-containers" \
+    local fails=0 key want got repo="https://github.com/swarm-routing/sim-containers"
+    local title="" description="" raw
+    if [ -n "${EXPECT_VERSION:-}" ] && [ -n "${EXPECT_PROFILE:-}" ] && [ -n "${EXPECT_OS:-}" ]; then
+        title="ns3-dev ${EXPECT_VERSION} ${EXPECT_PROFILE} (${EXPECT_OS})"
+        description="ns-3 ${EXPECT_VERSION} ${EXPECT_PROFILE} profile on ${EXPECT_OS}: a warm Ninja build for swarm-routing contrib modules"
+    fi
+    for pair in "org.opencontainers.image.source=$repo" \
+                "org.opencontainers.image.url=$repo" \
+                "org.opencontainers.image.documentation=$repo#which-image" \
+                "org.opencontainers.image.vendor=swarm-routing" \
+                "org.opencontainers.image.title=$title" \
+                "org.opencontainers.image.description=$description" \
                 "org.opencontainers.image.licenses=GPL-2.0-only" \
                 "org.opencontainers.image.version=${EXPECT_VERSION:-}" \
                 "io.github.swarm-routing.ns3.profile=${EXPECT_PROFILE:-}" \
@@ -134,10 +149,25 @@ labels() {
             echo "  FAIL  $key='$got', expected '$want'" >&2; fails=$((fails + 1))
         fi
     done
+    case "$image" in
+        *@sha256:*) ;;
+        *) echo "  SKIP  index annotations (a local image, not a registry digest)"; [ "$fails" -eq 0 ]; return ;;
+    esac
+    raw=$(docker buildx imagetools inspect --raw "$image") || { echo "  FAIL  cannot read the manifest of $image" >&2; return 1; }
+    for key in title description source url documentation vendor version licenses; do
+        key="org.opencontainers.image.$key"
+        want=$(docker image inspect --format "{{ index .Config.Labels \"$key\" }}" "$image")
+        got=$(KEY="$key" python3 -c 'import json,os,sys; m=json.load(sys.stdin); print((m.get("annotations") or {}).get(os.environ["KEY"], "") if "manifests" in m else "<not an index>")' <<<"$raw")
+        if [ -n "$want" ] && [ "$got" = "$want" ]; then
+            echo "  ok    index annotation $key=$got"
+        else
+            echo "  FAIL  index annotation $key='$got', expected the label '$want'" >&2; fails=$((fails + 1))
+        fi
+    done
     [ "$fails" -eq 0 ]
 }
 
-# Security (ns3-containers#38, #30), on the host with a digest-pinned Trivy.
+# Security (sim-containers#38, #30), on the host with a digest-pinned Trivy.
 # Gates: fixable vulnerabilities of MEDIUM or higher (the maintainer's
 # threshold), any secret in the image (files, and ENV/history in its config), HIGH+ Dockerfile misconfigurations
 # except the ones accepted with a reason in .trivyignore. Behind a

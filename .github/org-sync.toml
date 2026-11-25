@@ -9,7 +9,7 @@ bestpractices_project = "16818"
 zenodo_concept = "24202109"
 forms = true
 title = "sim-containers"
-dual = ["docker/", "test/smoke.sh", "test/run.sh", "test/structure.sh", "test/integration.sh", "test/profile.sh", "test/unit.sh", "test/downstream.sh", "tools/", ".github/workflows/"]
+dual = ["docker/", "test/smoke.sh", "test/run.sh", "test/structure.sh", "test/integration.sh", "test/profile.sh", "test/unit.sh", "test/downstream.sh", "test/protocol.sh", "tools/", ".github/workflows/"]
 ci_workflow = "publish-images.yml"
 posture = "the org's ns-3 development images (`ghcr.io/swarm-routing/ns3-dev`), used by every repository's CI"
 trust_boundary = """
@@ -27,13 +27,20 @@ limitations = """
 verifying = """
 ```bash
 cosign verify \\
-  --certificate-identity https://github.com/swarm-routing/ns3-containers/.github/workflows/publish-images.yml@refs/heads/main \\
+  --certificate-identity-regexp '^https://github\\.com/swarm-routing/(sim|ns3)-containers/\\.github/workflows/publish-images\\.yml@refs/heads/main$' \\
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \\
   ghcr.io/swarm-routing/ns3-dev:<tag>
 gh attestation verify oci://ghcr.io/swarm-routing/ns3-dev:<tag> --owner swarm-routing
 ```
 
 The first check is the signature; the second, the build provenance. The
+signatures are in the Sigstore bundle format, so `cosign verify` needs
+cosign 3 or later (cosign 2 reports "no signatures found"). Images signed
+since the repository was renamed (2026-11-22) carry the identity
+`https://github.com/swarm-routing/sim-containers/.github/workflows/publish-images.yml@refs/heads/main`,
+older ones the same path under `ns3-containers`; the expression accepts
+exactly those two, and `--certificate-identity` with the first one checks a
+current image alone. The
 CycloneDX SBOM is attested the same way: add
 `--predicate-type https://cyclonedx.org/bom`. For a
 published number, pin an immutable `-<sha7>` tag or a digest, never a
@@ -49,13 +56,13 @@ test/run.sh local/$(notdir $(CURDIR)):dev"""
 
 
 [docs]
-# the project page keeps its id on the site until the site follows the rename
-# (swarm-routing/swarm-routing.github.io#234; swarm-routing/.github#672)
-arena_id = "ns3-containers"
+# its id in swarm-routing.github.io site/hub/projects.json, the repository's name since the
+# site followed the rename (swarm-routing/swarm-routing.github.io#310; the old page redirects)
+arena_id = "sim-containers"
 [settings]
 # GitHub settings as code: swarm-routing/.github tools/repo-settings (swarm-routing/.github#117).
 description = "Pre-built, tested ns-3 images for contrib-module CI: ghcr.io/swarm-routing/ns3-dev with the ns-3 tree configured and built: debug, sanitized, default and optimized profiles on Ubuntu, debug and default on Debian, debug on Alpine; signed and attested."
-homepage = "https://swarm-routing.github.io/projects/ns3-containers/"
+homepage = "https://swarm-routing.github.io/projects/sim-containers/"
 topics = ["ns-3", "docker", "container-images", "ghcr", "ci", "sanitizers", "network-simulation", "reproducibility", "cosign"]
 ruleset = "tooling"
 # The image pipeline is required through its always-running `images gate` job (#80), not its

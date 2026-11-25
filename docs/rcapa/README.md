@@ -1,4 +1,4 @@
-# RCAPA: regressions in a release of swarm-routing/ns3-containers
+# RCAPA: regressions in a release of swarm-routing/sim-containers
 
 An **RCAPA** (root cause analysis with corrective and preventive actions) is
 the full record of one **regression in a published library**: a version of
@@ -6,7 +6,7 @@ it that another project consumes (a release pinned by a lock, PyPI, a vcpkg
 port) worked, and a later one broke. A bug or change that never reached a
 published version needs none (an ordinary `bug` issue is enough), a Docker
 image needs one only when its composition is the cause, and an upstream
-ns-3 bug is an `NS3-NNN` in swarm-routing/ns3-tools. The org's rule and its decision table are in
+ns-3 bug is an `NS3-NNN` in swarm-routing/sim-tools. The org's rule and its decision table are in
 [CONTRIBUTING.md, "RCAPA"](https://github.com/swarm-routing/.github/blob/main/CONTRIBUTING.md#rcapa)
 ([ADR-0003](https://github.com/swarm-routing/.github/blob/main/docs/adr/0003-rcapa-for-ns3-bugs-and-released-regressions.md)).
 This page is the project's flow and its index.
@@ -17,7 +17,7 @@ This repository publishes **images**, the `ghcr.io/swarm-routing/ns3-dev`
 tags. Images get **no RCAPA by default** (maintainer decision 2026-11-16): a
 broken image, a failing test stage or a consumer that stops building on a new
 image is an ordinary `bug` issue, and an upstream ns-3 bug met in an image is
-an `NS3-NNN` in swarm-routing/ns3-tools. An RCAPA applies **only when the
+an `NS3-NNN` in swarm-routing/sim-tools. An RCAPA applies **only when the
 defect is traced to the image's composition**: `docker/Dockerfile` and
 what it copies into the image (`docker/scripts/build-contrib.sh`, that is
 `ns3-build-contrib`; `docker/scripts/swarm-quality.cmake`;
@@ -29,7 +29,7 @@ the repository that owns the Dockerfile.
 |---|---|
 | Published as | promoted `ns3-dev` tags on ghcr.io; an RCAPA only for a defect in their composition (the Dockerfile and what it copies in: `build-contrib.sh`, `swarm-quality.cmake`, `gcovr-requirements.txt`; the configure line; the base image) |
 | ID prefix | `CNT-NNN` |
-| Ticket | an issue in swarm-routing/ns3-containers, form *Regression in a release (RCAPA)*, title `[rcapa] CNT-NNN <short description>`, labels `rcapa` and `bug`; name both images by tag **and** digest, and the composition change that caused it |
+| Ticket | an issue in swarm-routing/sim-containers, form *Regression in a release (RCAPA)*, title `[rcapa] CNT-NNN <short description>`, labels `rcapa` and `bug`; name both images by tag **and** digest, and the composition change that caused it |
 | Verified by | `docker pull` of both images by digest, then `test/run.sh` on the failing digest and the last good one (structure, profile, smoke with its Ninja step-count gate, integration, unit), and the downstream canary (`test/downstream.sh`, ubuntu debug only; a consumer outside its ns-3 range or without its module directory is skipped and named in the job log) |
 | Corrective action | the composition fix; `publish-images.yml` builds a new candidate, tests it by digest and promotes it (golden rule 17) |
 | Preventive action | a test stage or assertion in `test/` (structure, profile or smoke) that fails on the bad composition, so `promote` never copies it again |

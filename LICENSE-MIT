@@ -1,4 +1,4 @@
-The MIT option for the dual-licensed parts of swarm-routing/ns3-containers
+The MIT option for the dual-licensed parts of swarm-routing/sim-containers
 (SPDX-License-Identifier: MIT OR GPL-2.0-only; see LICENSING.md):
 
     docker/       the Dockerfile and `ns3-build-contrib`

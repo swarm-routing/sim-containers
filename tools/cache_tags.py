@@ -9,7 +9,7 @@ The buildx registry cache, ghcr.io/swarm-routing/ns3-dev-cache, has one tag
 per scope, `<ver>-<base>-<profile>` (the `cache` of a tools/ns3_matrix.py
 entry, e.g. 3.49-ubuntu-debug). Only the supported release is built by the
 automatic pipelines, so only its scopes have a reader: candidates-cleanup.yml
-deletes the others daily (golden rule 14, ns3-containers#146; maintainer
+deletes the others daily (golden rule 14, sim-containers#146; maintainer
 decision 2026-11-13). The scope an on-demand build of an older release
 writes goes the same way at the next cleanup: such a build is rare and its
 images are history, so its cache has no later reader.

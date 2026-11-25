@@ -69,6 +69,9 @@ class Stages(unittest.TestCase):
     def test_not_test_inputs(self):
         self.assertEqual(pt.stages_for(["docker/Dockerfile", "tools/test_ns3_matrix.py", "README.md",
                                         ".github/workflows/licence.yml", "testdata/x"]), [])
+        # the protocol image's stage and fixture (publish-protocol-images.yml)
+        self.assertEqual(pt.stages_for(["test/protocol.sh", "test/fixtures/protocol-hello/CMakeLists.txt",
+                                        "docker/protocol/Dockerfile", "tools/protocol_images.py"]), [])
 
 
 class Content(unittest.TestCase):

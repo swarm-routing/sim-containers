@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
-"""Pick the test jobs a pull request's images need (ns3-containers#86, #87).
+"""Pick the test jobs a pull request's images need (sim-containers#86, #87).
 
     tools/pr_tests.py refs --matrix JSON --digests DIR --candidate REF --image REF
     tools/pr_tests.py select --matrix JSON --inspect DIR [--summary FILE]
@@ -82,6 +82,9 @@ TEST_INPUTS = [
     (r"\.trivyignore", ("security",)),
     (r"tools/(ns3_matrix|pass_markers|pr_tests)\.py", ALL),
     (r"\.github/workflows/publish-images\.yml", ALL),
+    # The protocol stage applies to ns3-protocol-dev only (SKIP on ns3-dev):
+    # publish-protocol-images.yml tests its inputs, no ns3-dev stage reruns.
+    (r"test/(protocol\.sh|fixtures/protocol-hello/.*)", ()),
     (r"test/.*", ALL),
 ]
 

@@ -1,4 +1,4 @@
-# ns3-containers
+# sim-containers
 
 <!-- org-sync:begin badges -->
 | Group | Badges |
@@ -7,7 +7,7 @@
 | Quality | [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=swarm-routing_sim-containers&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=swarm-routing_sim-containers) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=swarm-routing_sim-containers&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=swarm-routing_sim-containers) [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/swarm-routing/sim-containers?utm_source=oss&utm_medium=github&utm_campaign=swarm-routing%2Fsim-containers&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai) |
 | Release | [![Release](https://img.shields.io/github/v/release/swarm-routing/sim-containers?sort=semver&cacheSeconds=1800)](https://github.com/swarm-routing/sim-containers/releases) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24202109.svg)](https://doi.org/10.5281/zenodo.24202109) [![Cite](https://img.shields.io/badge/cite-CITATION.cff-blue)](CITATION.cff) [![Licence: MIT OR GPL-2.0-only tooling](https://img.shields.io/badge/licence-MIT%20OR%20GPL--2.0--only%20tooling-blue)](LICENSING.md) |
 | Trust | [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/swarm-routing/sim-containers/badge)](https://scorecard.dev/viewer/?uri=github.com/swarm-routing/sim-containers) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16818/badge)](https://www.bestpractices.dev/projects/16818) [![Images signed: cosign](https://img.shields.io/badge/images%20signed-cosign-success)](SECURITY.md#verifying-what-it-ships) |
-| Community & docs | [![Colony Arena: ns3-containers](https://img.shields.io/badge/Colony%20Arena-project%20page-orange)](https://swarm-routing.github.io/projects/ns3-containers/) [![Open RCAPA](https://img.shields.io/github/issues/swarm-routing/sim-containers/rcapa?label=open%20RCAPA&color=blue)](https://github.com/swarm-routing/sim-containers/blob/main/docs/rcapa/README.md) [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow)](https://www.conventionalcommits.org) |
+| Community & docs | [![Colony Arena: sim-containers](https://img.shields.io/badge/Colony%20Arena-project%20page-orange)](https://swarm-routing.github.io/projects/sim-containers/) [![Open RCAPA](https://img.shields.io/github/issues/swarm-routing/sim-containers/rcapa?label=open%20RCAPA&color=blue)](https://github.com/swarm-routing/sim-containers/blob/main/docs/rcapa/README.md) [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow)](https://www.conventionalcommits.org) |
 <!-- org-sync:end badges -->
 
 Pre-built **ns-3** images for `swarm-routing` contrib modules:
@@ -65,7 +65,7 @@ with SIGILL on another CPU.
 | `:3.49`, `:3.49-debug` (`-default`, `-sanitized`, `-optimized`) | Ubuntu, that release and profile |
 | `:3.49-debian-debug`, `:3.49-slim` (`= -slim-default`) | other bases |
 | `:3.46-debug` and `:3.46.1-debug` | a patch release is tagged under both numbers |
-| any versioned tag + `-<sha7>` | immutable: the ns3-containers commit that built it |
+| any versioned tag + `-<sha7>` | immutable: the sim-containers commit that built it |
 
 CI that should track ns-3 uses `latest-debug` / `latest-sanitized`; anything
 that produces a published number pins a versioned `-<sha7>` tag.
@@ -87,6 +87,57 @@ Modules built: `core network internet wifi mesh mobility energy flow-monitor
 applications point-to-point csma aodv olsr dsdv dsr stats` (plus their
 dependencies).
 
+### The protocol-CI image (`ns3-protocol-dev`)
+
+`ghcr.io/swarm-routing/ns3-protocol-dev` is an ns3-dev image with the two
+modules every swarm-routing protocol builds on already built in its warm
+tree: **swarm-core** (swarm-routing/swarm-adapter-ns3) and **routing-bench**
+(swarm-routing/sim-tools `ns3/routing-bench`), each at its newest release
+tag. A protocol's CI on it compiles only the protocol module. Profiles
+`debug` and `sanitized` (what CI consumes), Ubuntu.
+
+| Tag | Image |
+|---|---|
+| `:latest-debug`, `:latest-sanitized` | the supported ns-3 release with the newest module releases |
+| `:3.49-debug` | that ns-3 release with the newest module releases |
+| `:3.49-debug-swarmcore2.0.0-routingbench1.1.3` | those exact versions (rebuilt when ns3-dev's image moves) |
+| the tag above + `-<sha7>` | immutable: the sim-containers commit that built it |
+
+Use the image's paths for the prebuilt modules, listed first, and your own
+module after them; `--quality-modules` keeps the quality options off the
+prebuilt ones:
+
+```bash
+docker run --rm -v "$PWD:/src/ara:ro" ghcr.io/swarm-routing/ns3-protocol-dev:latest-debug bash -c \
+    '. /opt/ns-3/.swarm-modules.env && ns3-build-contrib --strict-warnings --quality-modules ara \
+         --test $SWARM_MODULE_SPECS ara=/src/ara/ns3'
+```
+
+`/opt/ns-3/.swarm-modules.env` records each module (`SWARM_PREBUILT`: its
+repository, tag, commit and path), and the image labels carry the same
+(`io.github.swarm-routing.dependencies`, `.swarm-core.version`,
+`.routing-bench.version`, `.ns3-dev.image`: the ns3-dev digest it was built
+on). The org's `reusable-ns3-ci.yml` uses it with `protocol-image: true`: a
+`dependencies` entry at the commit the image holds is used prebuilt, any other
+is built from source over it, as before. Measured on ns-3.49 with ARA
+(swarm-core v2.0.0, routing-bench v1.1.3, `--strict-warnings`, 4 cores): 67
+Ninja steps on ns3-dev, 33 on ns3-protocol-dev (ARA's own 18, the
+routing-bench programs rebuilt with ARA's arm registered, the executables
+that link every module); the build took 50 s against 20 s on `debug`, 115 s
+against 44 s on `sanitized`.
+
+*Publish protocol images* (`publish-protocol-images.yml`) builds it from
+`docker/protocol/Dockerfile` with the inputs `tools/protocol_images.py`
+resolves (ns3-dev `latest-*` by digest, each module's highest `vX.Y.Z` tag
+and its commit), after every successful *Publish images* run on main and
+daily, and only when an input changed; it is tested by digest
+(`test/run.sh`, every stage but `labels` and `unit`, `protocol` included) before it is
+tagged. It inherits ns3-dev's `unit` verdict: its stock ns-3 libraries are
+the base ns3-dev image's files, unrebuilt, which its `protocol` stage proves
+(golden rule 17's one exception; maintainer decision 2026-11-24, #256). The
+package name and the tag scheme above are kept as built (maintainer decision
+2026-11-24, #256).
+
 ## Need another distribution, version or compiler?
 
 The published set is deliberately small: the release ns-3 supports (older
@@ -97,7 +148,7 @@ hosts run these Linux images through Docker Desktop, Colima or WSL2.
 If your work needs something else (another distribution or release, such as
 Rocky Linux or Ubuntu 22.04; a specific compiler, such as clang or an older
 gcc; an older ns-3 release that should be built or maintained; extra ns-3 modules or features such
-as MPI or Python bindings), **[open an *Image request* issue](https://github.com/swarm-routing/ns3-containers/issues/new?template=image-request.yml)**
+as MPI or Python bindings), **[open an *Image request* issue](https://github.com/swarm-routing/sim-containers/issues/new?template=image-request.yml)**
 with your ns-3 requirements: version, distribution, compiler, profile,
 architecture, the modules you need, and why an existing image does not fit.
 Requests that name a concrete lab, cluster or CI constraint are what get an
@@ -173,7 +224,7 @@ passes its matrix entry and commit):
 
 | Stage | Checks |
 |---|---|
-| `labels` | the OCI labels: source, licence, ns-3 version, profile, base, revision |
+| `labels` | the OCI labels: source, url, documentation, vendor, licence, ns-3 version, profile, base, title and description (both naming the ns-3 version, profile and base, e.g. `ns3-dev 3.49 debug (ubuntu)`), revision, build run; for a candidate addressed by digest, the index annotations too (title, description, source, url, documentation, vendor, version, licence: equal to the labels), which the registry's package page shows and promote copies unchanged |
 | `structure` | `/opt/ns-3` configured and built, `ns3-build-contrib` on `PATH`, the environment, the recorded configure line and module list (equal to the Dockerfile's, every module built), the CMake cache matching the profile (build type, asserts, logs, sanitizers, no native optimizations, examples and tests on), the C++ standard the tree requires, `gcovr` at its pinned version on `debug` and `sanitized`, `unzip`, `curl` and `gpg` on `debug` |
 | `profile` | the profile does what its name says: asserts abort and `NS_LOG` prints (`default`, `debug`, `sanitized`) or both are compiled out (`optimized`); on `sanitized`, a planted use-after-free, leak and signed overflow are each reported by ASan, LSan and UBSan; no AVX/AVX-512 instruction in the stock core library (nothing built for the build machine's CPU) |
 | `smoke` | builds `test/fixtures/swarm-hello`, runs its test.py suite, fails above 40 Ninja steps (the warm cache was missed); `--strict-warnings`, `--quality-modules` and `--coverage` do what they promise, and the image's `gcovr` reports the module's coverage |
@@ -291,7 +342,9 @@ the new ubuntu `debug` candidate by `test/downstream.sh <image>`: today all
 seven lines are built and tested: `swarm-adapter-ns3` (`swarm-core`), `ns3-tools`
 (`routing-bench` + its stock-arm delivery check, without `aodv` while #35
 lasts), AntHocNet (its seven modules, swarm-core included, staged by
-`make install-ns3`, its suites and `anthocnet-example`), and ARA, BeeAdHoc, Termite and HOPNET (each
+`make install-ns3`, its suites and `anthocnet-example`, then, through its
+`ci/canary.sh`, the behaviour gates a release can move: the arm-delivery
+smoke and its validation anchors, AntHocNet#1222), and ARA, BeeAdHoc, Termite and HOPNET (each
 protocol's `ns3/` module on `swarm-core`, its own suite). A line whose module
 directory does not exist yet is skipped with the reason, so a repository can
 be listed before it has an `ns3/` module. Each consumer runs in a fresh container
@@ -337,8 +390,8 @@ evidence; this is the summary a user of the images needs.
 
 | ns-3 | What | Status |
 |---|---|---|
-| **3.49** (the supported release, `latest`) | **Stock AODV never finishes a sparse MANET run.** ns-3.49's new `Ipv4L3Protocol::SendIcmpNoRoute` (RFC 1812 ICMP "net unreachable") feeds back into AODV's deferred route output: the ICMP error has no route either, is queued through loopback into the full request queue, whose drop raises another ICMP error, all at one simulated instant (1,284,336 errors at +8.146253127 s in one run). Simulated time stops; the process spins until killed. OLSR and DSDV are unaffected; AODV-derived protocols (AntHocNet's vendored AOMDV) hang too. Reproducer, stock models only: [`manet-canary`](test/fixtures/manet-canary/) `--protocol=aodv --range=100`, which finishes in 2 s on 3.48 and never on 3.49; stock `manet-routing-compare` with its defaults does *not* trigger it. ns-3-dev still has the code (2026-11-01); no upstream report filed yet. | upstream bug; reproduced on every run as a strict expected failure (`test/known-failures.txt`); [#35](https://github.com/swarm-routing/ns3-containers/issues/35), [AntHocNet#843](https://github.com/swarm-routing/AntHocNet/issues/843); the org's register: [NS3-001](https://github.com/swarm-routing/ns3-tools/blob/main/docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md) |
-| **3.48** (history, on demand) | **Four wifi unit suites fail** (`wifi-txop`, `wifi-mlo`, `wifi-gcr`, `wifi-emlsr-basic-exchanges`) with the images' 16-module set, on both profiles; they **pass** on 3.48 with every ns-3 module and on 3.49 with the images' set. With the images' set the simulation transmits fewer frames than the test expects, and the test then indexes past its frame list (UBSan: member call on an invalid `WifiMacHeader` at `wifi-txop-test.cc:1427`, a SIGSEGV without sanitizers). The suites test 802.11ax/be machinery (EMLSR, MLO, groupcast, TXOP limits) that 802.11a/b ad-hoc MANET work does not use. | cause not yet classified (module dependency vs ns-3 test bug); an on-demand 3.48 build fails the `unit` stage until it is; [#49](https://github.com/swarm-routing/ns3-containers/issues/49) |
+| **3.49** (the supported release, `latest`) | **Stock AODV never finishes a sparse MANET run.** ns-3.49's new `Ipv4L3Protocol::SendIcmpNoRoute` (RFC 1812 ICMP "net unreachable") feeds back into AODV's deferred route output: the ICMP error has no route either, is queued through loopback into the full request queue, whose drop raises another ICMP error, all at one simulated instant (1,284,336 errors at +8.146253127 s in one run). Simulated time stops; the process spins until killed. OLSR and DSDV are unaffected; AODV-derived protocols (AntHocNet's vendored AOMDV) hang too. Reproducer, stock models only: [`manet-canary`](test/fixtures/manet-canary/) `--protocol=aodv --range=100`, which finishes in 2 s on 3.48 and never on 3.49; stock `manet-routing-compare` with its defaults does *not* trigger it. ns-3-dev `master` still has the code; reported upstream as [nsnam/ns-3-dev#1408](https://gitlab.com/nsnam/ns-3-dev/-/work_items/1408), fix proposed in [nsnam/ns-3-dev!3101](https://gitlab.com/nsnam/ns-3-dev/-/merge_requests/3101) (open, not ours). The images stay stock; the org works around it in the harness: sim-tools' `routing-bench` (v1.1.3+) installs AODV behind its `IcmpErrorGuardHelper`, which applies !3101's suppression rules ([swarm-routing/sim-tools#322](https://github.com/swarm-routing/sim-tools/pull/322)). | upstream bug, open; reproduced on every run as a strict expected failure (`test/known-failures.txt`); [#35](https://github.com/swarm-routing/sim-containers/issues/35), [AntHocNet#843](https://github.com/swarm-routing/AntHocNet/issues/843); the org's register: [NS3-001](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-bugs.md) ([root cause](https://github.com/swarm-routing/sim-tools/blob/main/docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md)) |
+| **3.48** (history, on demand) | **Four wifi unit suites fail** (`wifi-txop`, `wifi-mlo`, `wifi-gcr`, `wifi-emlsr-basic-exchanges`) with the images' 16-module set, on both profiles; they **pass** on 3.48 with every ns-3 module and on 3.49 with the images' set. With the images' set the simulation transmits fewer frames than the test expects, and the test then indexes past its frame list (UBSan: member call on an invalid `WifiMacHeader` at `wifi-txop-test.cc:1427`, a SIGSEGV without sanitizers). The suites test 802.11ax/be machinery (EMLSR, MLO, groupcast, TXOP limits) that 802.11a/b ad-hoc MANET work does not use. | cause not yet classified (module dependency vs ns-3 test bug); an on-demand 3.48 build fails the `unit` stage until it is; [#49](https://github.com/swarm-routing/sim-containers/issues/49) |
 
 Corrections that came out of the tests:
 

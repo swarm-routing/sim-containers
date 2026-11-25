@@ -30,8 +30,8 @@ and is much slower.
 ## Get the code
 
 ```bash
-git clone https://github.com/swarm-routing/ns3-containers.git
-cd ns3-containers
+git clone https://github.com/swarm-routing/sim-containers.git
+cd sim-containers
 ```
 
 There are no submodules. `test/downstream.sh --check` reads a script from
@@ -54,7 +54,7 @@ protocol repositories, not this one.
 One image, locally:
 
 ```bash
-make build PLATFORM=linux/amd64    # docker buildx build --load --platform linux/amd64 -f docker/Dockerfile -t local/ns3-containers:dev .
+make build PLATFORM=linux/amd64    # docker buildx build --load --platform linux/amd64 -f docker/Dockerfile -t local/sim-containers:dev .
 docker build --platform linux/amd64 -f docker/Dockerfile --build-arg NS3_VERSION=3.48 \
     --build-arg BUILD_PROFILE=debug -t ns3-dev:3.48-debug .      # a given release and profile
 ```
@@ -135,7 +135,7 @@ and hadolint's go to the repository's code scanning alerts.
 On a pull request, `publish-images.yml` tests only the images the change
 affects (`tools/pr_tests.py`; AGENTS.md golden rule 17 has the rules), so a
 docs-only PR builds nothing. The required checks are the ones the `main`
-ruleset lists: `gh api repos/swarm-routing/ns3-containers/rules/branches/main`.
+ruleset lists: `gh api repos/swarm-routing/sim-containers/rules/branches/main`.
 `main` merges through a merge queue, so a pull request is merged by enabling
 auto-merge.
 

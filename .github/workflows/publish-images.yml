@@ -12,7 +12,7 @@ name: Publish images
 # `versions` input (Ubuntu x default, debug); its images are history and no
 # automatic pipeline rebuilds them.
 #
-# Build once, test by digest, promote by retagging (ns3-containers#37):
+# Build once, test by digest, promote by retagging (sim-containers#37):
 #
 #   build    each image is built ONCE and pushed to the candidate package
 #            ns3-dev-ci (never pulled by consumers); its digest is recorded
@@ -28,14 +28,14 @@ name: Publish images
 #            non-blocking Trivy CVE report of that digest goes to code scanning
 #   canary   the org's ns-3 modules (test/downstream.txt) are built and
 #            tested on the ubuntu debug candidate by test/downstream.sh, in
-#            parallel with promote (ns3-containers#44); a failing consumer
+#            parallel with promote (sim-containers#44); a failing consumer
 #            opens or updates an issue here
 #   latest   the latest-* tags move last, only when every required image of
 #            the run passed and every downstream canary passed (Alpine is
 #            experimental: it never blocks)
 #
 # Automatic and on-demand builds go through the same jobs and the same tests
-# (ns3-containers#36). Two exceptions, on pull requests only: the Debian,
+# (sim-containers#36). Two exceptions, on pull requests only: the Debian,
 # slim and Alpine images run the `light` unit group (UNIT_SET, from the
 # matrix entry's pr_unit_set; #87), Ubuntu debug and sanitized keep `full`;
 # and every image leaves out the suites on test/ns3-suites.txt's `main-only`
@@ -301,7 +301,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     # Alpine (musl) is outside ns-3's supported platforms: its failure is
-    # reported but never fails the run (ns3-containers#8).
+    # reported but never fails the run (sim-containers#8).
     continue-on-error: ${{ matrix.experimental }}
     permissions:
       contents: read
@@ -327,6 +327,31 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # The Dockerfile's descriptive labels, as index and manifest annotations
+      # (the same values: test/run.sh `labels` compares both).
+      - name: Image annotations
+        id: annotations
+        if: env.WRITE_REGISTRY == 'true'
+        env:
+          VER: ${{ matrix.version }}
+          PROFILE: ${{ matrix.profile }}
+          BASE: ${{ matrix.os }}
+        run: |
+          repo="https://github.com/swarm-routing/sim-containers"
+          {
+            echo "list<<EOF_ANNOTATIONS"
+            for level in index manifest; do
+              echo "${level}:org.opencontainers.image.title=ns3-dev ${VER} ${PROFILE} (${BASE})"
+              echo "${level}:org.opencontainers.image.description=ns-3 ${VER} ${PROFILE} profile on ${BASE}: a warm Ninja build for swarm-routing contrib modules"
+              echo "${level}:org.opencontainers.image.source=${repo}"
+              echo "${level}:org.opencontainers.image.url=${repo}"
+              echo "${level}:org.opencontainers.image.documentation=${repo}#which-image"
+              echo "${level}:org.opencontainers.image.vendor=swarm-routing"
+              echo "${level}:org.opencontainers.image.version=${VER}"
+              echo "${level}:org.opencontainers.image.licenses=GPL-2.0-only"
+            done
+            echo "EOF_ANNOTATIONS"
+          } >> "$GITHUB_OUTPUT"
       # The one and only build of this image. It is pushed under a unique
       # candidate tag; everything after this addresses it by digest.
       - name: Build once (push the candidate)
@@ -349,6 +374,13 @@ jobs:
           load: ${{ env.WRITE_REGISTRY != 'true' }}
           cache-from: type=registry,ref=${{ env.CACHE }}:${{ matrix.cache }}
           cache-to: ${{ env.WRITE_REGISTRY == 'true' && format('type=registry,ref={0}:{1},mode=max,image-manifest=true,oci-mediatypes=true', env.CACHE, matrix.cache) || '' }}
+          # The pushed candidate is an index (the image + its attestation
+          # manifest); GitHub's package page reads a multi-manifest image's
+          # description and source from the index annotations. They are set
+          # here, at the one build, so the tested digest already carries them
+          # and promote's `imagetools create` copies them byte for byte. A
+          # fork PR loads a single image, which has no index: none there.
+          annotations: ${{ steps.annotations.outputs.list }}
       - name: Record the digest
         if: env.WRITE_REGISTRY == 'true'
         env:

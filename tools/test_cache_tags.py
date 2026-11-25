@@ -16,7 +16,7 @@ import cache_tags as c  # noqa: E402
 import ns3_matrix as m  # noqa: E402
 
 # The anonymous tag list of ghcr.io/swarm-routing/ns3-dev-cache on 2026-11-13,
-# as ns3-containers#146 records it: 9 scopes of 3.49, 30 of 3.40 to 3.48.
+# as sim-containers#146 records it: 9 scopes of 3.49, 30 of 3.40 to 3.48.
 ISSUE_146 = [
     "3.45-ubuntu-debug", "3.41-ubuntu-default", "3.49-ubuntu-optimized", "3.49-ubuntu-default",
     "3.45-ubuntu-default", "3.49-alpine-debug", "3.49-ubuntu-sanitized", "3.47-debian-debug",

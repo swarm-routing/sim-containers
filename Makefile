@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# ns3-containers: the org's standard targets (swarm-routing/.github#11). Every org
+# sim-containers: the org's standard targets (swarm-routing/.github#11). Every org
 # repo has these same target names, with this repo's own commands behind them;
 # `org-sync check` verifies the names are present, never the recipes. Add
 # repo-only targets at the end. `make help` lists everything with a `## ` note.
@@ -40,7 +40,7 @@ shell: ## an interactive shell in the dev image with this repo at /src
 	docker run --rm -it -v "$(CURDIR):/src" -w /src $(if $(PLATFORM),--platform $(PLATFORM)) $(NS3_IMAGE) bash
 
 headers: org-tools ## licence headers (org rule 1)
-	"$(ORG_DIR)/tools/checks/check-headers.sh" --dual docker/ --dual test/smoke.sh --dual test/run.sh --dual test/structure.sh --dual test/integration.sh --dual test/profile.sh --dual test/unit.sh --dual test/downstream.sh --dual tools/ --dual .github/workflows/ .
+	"$(ORG_DIR)/tools/checks/check-headers.sh" --dual docker/ --dual test/smoke.sh --dual test/run.sh --dual test/structure.sh --dual test/integration.sh --dual test/profile.sh --dual test/unit.sh --dual test/downstream.sh --dual test/protocol.sh --dual tools/ --dual .github/workflows/ .
 
 check: lint test headers org-sync-check ## everything CI gates on
 

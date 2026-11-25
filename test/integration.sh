@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
 #
-# Integration test (ns3-containers#42), run inside an ns3-dev image with this
+# Integration test (sim-containers#42), run inside an ns3-dev image with this
 # repository mounted at /src: does the image's ns-3 actually simulate?
 #
 #   docker run --rm -v "$PWD:/src:ro" <image> bash /src/test/integration.sh

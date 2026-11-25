@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
 // manet-canary: a short, sparse ad-hoc MANET run of one stock routing model,
-// for the image integration test (ns3-containers#42). Sparse on purpose: a
+// for the image integration test (sim-containers#42). Sparse on purpose: a
 // small range in a large area keeps the network partitioned part of the
 // time, which exercises the "no route" paths (route discovery, request-queue
-// drops, ICMP errors) where ns-3.49's AODV livelocks (ns3-containers#35).
+// drops, ICMP errors) where ns-3.49's AODV livelocks (sim-containers#35).
 //
 //   manet-canary --protocol=aodv|olsr|dsdv [--nodes=16] [--area=500]
 //                [--range=175] [--pause=120] [--speed=20] [--flows=3]

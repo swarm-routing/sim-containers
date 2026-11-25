@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
 #
-# ns-3's own unit suites (ns3-containers#40), run inside an ns3-dev image with
+# ns-3's own unit suites (sim-containers#40), run inside an ns3-dev image with
 # this repository mounted at /src:
 #
 #   docker run --rm -v "$PWD:/src:ro" <image> bash /src/test/unit.sh
@@ -19,7 +19,7 @@
 # UNIT_SET=full|light picks the group. Unset, the profile picks it: `full` on
 # debug and sanitized, `light` on default and optimized. The pipeline sets
 # UNIT_SET=light only on a pull request, for the Debian, slim and Alpine images
-# (ns3-containers#87); a push to main and any run without UNIT_SET run the
+# (sim-containers#87); a push to main and any run without UNIT_SET run the
 # profile's group. Every suite's time is printed (`TIME <s> <suite>`, slowest
 # first) so the stage's cost can be split on measured numbers (#86).
 #
@@ -32,7 +32,7 @@
 # `main-only` line are left out of test.py's list, and the stage says which
 # (a SKIP line per suite, and in the group line the step summary shows).
 # Unset, every suite of the group runs, as on main, schedule and dispatch
-# runs, where the image is promoted (ns3-containers#86, #87).
+# runs, where the image is promoted (sim-containers#86, #87).
 # Suites listed for this exact ns-3 version in test/known-failures.txt
 # (`unit:<suite>`) must fail; any other failure fails the stage.
 set -uo pipefail

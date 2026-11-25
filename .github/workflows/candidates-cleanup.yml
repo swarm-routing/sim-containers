@@ -12,7 +12,7 @@ name: Candidates cleanup
 #                  versions older than a day are deleted. A cache tag is one
 #                  scope, <ver>-<base>-<profile>; only the supported release
 #                  is built automatically, so the scopes of every other
-#                  release are deleted too (golden rule 14, ns3-containers#146;
+#                  release are deleted too (golden rule 14, sim-containers#146;
 #                  maintainer decision 2026-11-13). tools/cache_tags.py
 #                  selects them, with the supported release read from
 #                  upstream's tags as tools/ns3_matrix.py reads it. The scope
@@ -22,7 +22,7 @@ name: Candidates cleanup
 #                  cannot be determined, or the package has no scope of it,
 #                  nothing is deleted and the summary says so.
 # The published package, ns3-dev, is never touched: its untagged versions are
-# the child and attestation manifests of tagged images (ns3-containers#36).
+# the child and attestation manifests of tagged images (sim-containers#36).
 # It runs as a job of every pipeline on main (publish-images.yml's `sweep`),
 # and daily, for the candidates of PR runs while main is quiet.
 on:

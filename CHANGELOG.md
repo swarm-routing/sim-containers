@@ -6,6 +6,7 @@
 
 ### Fix
 
+- **ci**: canary only the images select tested (#276)
 - follow the rename to sim-containers in the cosign identity, links and release asset (#262)
 - **images**: describe each ns3-dev image in its labels and index annotations (#255)
 - **test**: stop the smoke's deprecated-warning check failing on SIGPIPE (#244)

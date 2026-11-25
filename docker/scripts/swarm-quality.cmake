@@ -13,7 +13,7 @@
 #   SWARM_STRICT_WARNINGS   ON: strict warnings as errors, except
 #                           -Wdeprecated-declarations, which stays a warning
 #                           (a dependency's two-step deprecation must not break
-#                           a consumer: swarm-routing/ns3-swarm-core
+#                           a consumer: swarm-routing/swarm-adapter-ns3
 #                           docs/api-policy.md, #167). The generated
 #                           include tree (ns-3's and other modules' headers)
 #                           is -isystem for these targets, so only the

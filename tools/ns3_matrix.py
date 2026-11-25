@@ -20,18 +20,31 @@ branches or backports. That release gets:
     slim     x default, debug
     alpine   x debug (experimental: may fail)
 
+    ubuntu   x debug, sanitized, patched (the patched variant, below)
+
 Any other ns-3 release is built **on demand** with --versions (a manual
 workflow_dispatch), as ubuntu x default, debug. Its images are then history:
-no automatic pipeline rebuilds them.
+no automatic pipeline rebuilds them. It gets no patched variant.
+
+The patched variant (docs/adr/0002-patched-image-variant.md; sim-tools
+ADR-0002, swarm-routing/sim-tools#381) is the stock image's build with the
+self-detecting ns-3 patches of swarm-routing/sim-tools applied to the tree
+before configure: PATCHES, from sim-tools at SIM_TOOLS_COMMIT, pinned by full
+SHA here (invariant 13) and fetched by commit in the Dockerfile. Its entries
+have `variant` "patched", `patches` and `sim_tools_commit` set (empty on a
+stock entry, so a stock build passes neither), a name and cache scope ending
+in `-patched`, and their own tags (stock tags never move to a patched image).
 
 Tags of one entry (ver = minor, e.g. 3.46; a patch release, e.g. 3.46.1, is
 also tagged under its full number):
 
     ubuntu   :<ver>-<profile>, and :<ver> for `default`
     others   :<ver>-<os>-<profile>, and :<ver>-<os> for `default`
+    patched  :<ver>-<profile>-patched (ubuntu only)
     every one of those also gets an immutable -<sha7> twin
     the supported release also: :latest-<profile> / :latest-<os>-<profile>,
-             and :latest (ubuntu default) / :latest-<os>
+             and :latest (ubuntu default) / :latest-<os>; a patched image
+             :latest-<profile>-patched
 
 An entry's `tags` are set when its image passes its tests; its `latest_tags`
 (empty except for the supported release) move last, once every required image
@@ -59,8 +72,9 @@ pull request whose images are all unchanged from what `main` last tested and
 promoted, but whose test stages changed (tools/pr_tests.py, #86, #87): the
 changed stages run on these only. They are Ubuntu debug, sanitized and
 optimized, plus one image per other base: Debian debug, slim default (so the
-`default` profile is covered too) and Alpine debug. An on-demand release has
-only Ubuntu default and debug; debug stands for it.
+`default` profile is covered too) and Alpine debug, plus the patched
+sanitized image (the one where the `patches` stage runs the reproducers). An
+on-demand release has only Ubuntu default and debug; debug stands for it.
 
 --tier latest keeps only the supported release's entries (its full set, the
 images the automatic pipelines own). It is what an OS security refresh
@@ -96,7 +110,7 @@ import urllib.request
 
 UPSTREAM = "https://gitlab.com/nsnam/ns-3-dev.git"
 SUITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "test", "ns3-suites.txt")
-STAGES = ["labels", "security", "structure", "profile", "smoke", "integration", "unit"]
+STAGES = ["labels", "security", "structure", "profile", "smoke", "integration", "patches", "unit"]
 # Which unit group a profile runs (test/unit.sh's default, without UNIT_SET).
 PROFILE_GROUP = {"debug": "full", "sanitized": "full", "default": "light", "optimized": "light"}
 IMAGE = "ghcr.io/swarm-routing/ns3-dev"
@@ -117,6 +131,16 @@ LIGHT = ["default", "debug"]
 # profile of the supported release's plan has one (test_ns3_matrix.py).
 REPRESENTATIVES = {("ubuntu", "debug"), ("ubuntu", "sanitized"), ("ubuntu", "optimized"),
                    ("debian", "debug"), ("slim", "default"), ("alpine", "debug")}
+
+# The patched variant (docs/adr/0002-patched-image-variant.md; maintainer
+# decision 2026-11-25, swarm-routing/sim-tools#381): the sim-tools commit the
+# patches come from, pinned by full SHA (invariant 13), the patches applied
+# (each `ns3/patches/<ID>/apply.sh` there, self-detecting), and the
+# supported release's images that get the variant: the profiles CI consumes.
+SIM_TOOLS_COMMIT = "1b36c739e0374295fc961772c044ecf90fb1b619"
+PATCHES = ["NS3-005"]
+PATCHED = [("ubuntu", "debug"), ("ubuntu", "sanitized")]
+PATCHED_REPRESENTATIVES = {("ubuntu", "sanitized")}
 
 TAG_RE = re.compile(r"^ns-3\.(\d+)(?:\.(\d+))?$")
 
@@ -148,30 +172,32 @@ def releases(versions):
     return [(f"3.{m}", versions[m]) for m in sorted(versions, reverse=True)]
 
 
-def tags_for(minor, full, os_, profile, newest, sha7):
+def tags_for(minor, full, os_, profile, newest, sha7, variant="stock"):
     """(versioned + pinned tags, latest tags) of one image."""
+    suffix = "" if variant == "stock" else f"-{variant}"
     labels = [minor] + ([full] if full != minor else [])
     tags = []
     for label in labels:
         stem = label if os_ == "ubuntu" else f"{label}-{os_}"
-        tags.append(f"{stem}-{profile}")
-        if profile == "default":
+        tags.append(f"{stem}-{profile}{suffix}")
+        if profile == "default" and not suffix:
             tags.append(stem)
     pinned = [f"{t}-{sha7}" for t in tags] if sha7 else []
     latest = []
     if newest:
         stem = "latest" if os_ == "ubuntu" else f"latest-{os_}"
-        latest = [f"{stem}-{profile}"] + ([stem] if profile == "default" else [])
+        latest = [f"{stem}-{profile}{suffix}"] + ([stem] if profile == "default" and not suffix else [])
     return tags + pinned, latest
 
 
 def plan_for(supported):
-    """(os, profile) pairs: the full set for the supported release, else on-demand."""
+    """(os, profile, variant) triples: the full set for the supported release, else on-demand."""
     if not supported:
-        return [("ubuntu", p) for p in LIGHT]
-    return ([("ubuntu", p) for p in FULL]
-            + [(os_, p) for os_ in ("debian", "slim") for p in LIGHT]
-            + [("alpine", "debug")])
+        return [("ubuntu", p, "stock") for p in LIGHT]
+    return ([("ubuntu", p, "stock") for p in FULL]
+            + [(os_, p, "stock") for os_ in ("debian", "slim") for p in LIGHT]
+            + [("alpine", "debug", "stock")]
+            + [(os_, p, "patched") for os_, p in PATCHED])
 
 
 def entries(chosen, newest_full, sha7="", splits=None):
@@ -179,21 +205,26 @@ def entries(chosen, newest_full, sha7="", splits=None):
     out = []
     for minor, full in chosen:
         newest = full == newest_full
-        for os_, profile in plan_for(newest):
-            tags, latest = tags_for(minor, full, os_, profile, newest, sha7)
+        for os_, profile, variant in plan_for(newest):
+            tags, latest = tags_for(minor, full, os_, profile, newest, sha7, variant)
+            patched = variant == "patched"
+            suffix = "-patched" if patched else ""
             out.append({
                 "version": full,
                 "minor": minor,
                 "os": os_,
                 "profile": profile,
+                "variant": variant,
+                "patches": " ".join(PATCHES) if patched else "",
+                "sim_tools_commit": SIM_TOOLS_COMMIT if patched else "",
                 "base_image": BASES[os_],
                 "experimental": os_ == "alpine",
-                "name": f"{minor}-{os_}-{profile}" if os_ != "ubuntu" else f"{minor}-{profile}",
-                "cache": f"{minor}-{os_}-{profile}",
+                "name": (f"{minor}-{os_}-{profile}" if os_ != "ubuntu" else f"{minor}-{profile}") + suffix,
+                "cache": f"{minor}-{os_}-{profile}{suffix}",
                 "tags": " ".join(tags),
                 "latest_tags": " ".join(latest),
                 "pr_unit_set": "" if os_ == "ubuntu" else "light",
-                "representative": (os_, profile) in REPRESENTATIVES,
+                "representative": (os_, profile) in (PATCHED_REPRESENTATIVES if patched else REPRESENTATIVES),
                 "test_parts": test_parts(profile, splits),
             })
     return out
@@ -278,7 +309,8 @@ def test_matrix(images):
 def own_tag(e):
     """The versioned tag only this entry's image gets, under the release's full number."""
     stem = e["version"] if e["os"] == "ubuntu" else f"{e['version']}-{e['os']}"
-    return f"{stem}-{e['profile']}"
+    suffix = "" if e.get("variant", "stock") == "stock" else f"-{e['variant']}"
+    return f"{stem}-{e['profile']}{suffix}"
 
 
 def missing_only(matrix, is_published):

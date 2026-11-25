@@ -91,7 +91,11 @@ name: Publish images
 # Tags (see tools/ns3_matrix.py): :<ver>-<profile>, :<ver> (= default profile),
 # :<ver>-<os>-<profile>, the supported release's :latest-<profile> and :latest,
 # and an immutable -<sha7> twin of each versioned tag; pin the twin in anything
-# that produces a published number.
+# that produces a published number. The patched variant (Ubuntu debug and
+# sanitized of the supported release, sim-tools' self-detecting ns-3 patches
+# applied before configure; docs/adr/0002-patched-image-variant.md) goes
+# through the same jobs under its own :<ver>-<profile>-patched and
+# :latest-<profile>-patched tags; the stock tags never point at it.
 #
 # Cache: buildx registry cache in ghcr.io/<owner>/ns3-dev-cache, one tag per
 # version x os x profile (`mode=max`), outside the 10 GB Actions cache. main
@@ -289,7 +293,10 @@ jobs:
           { echo "matrix=$matrix"; echo "tests=$tests"; echo "count=$count"; } >> "$GITHUB_OUTPUT"
           # The downstream canary runs on the ubuntu debug image of each
           # release (what consumers' CI builds on; test/downstream.sh).
-          canary=$(printf '%s' "$matrix" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(json.dumps({"include": [e for e in m["include"] if e["os"] == "ubuntu" and e["profile"] == "debug"]}))')
+          # The stock image only: the patched variant differs from it only in
+          # the patched sources, and its latest-* moves with the others after
+          # this same canary (docs/adr/0002-patched-image-variant.md).
+          canary=$(printf '%s' "$matrix" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(json.dumps({"include": [e for e in m["include"] if e["os"] == "ubuntu" and e["profile"] == "debug" and e["variant"] == "stock"]}))')
           echo "canary=$canary" >> "$GITHUB_OUTPUT"
           echo "canary_count=$(printf '%s' "$canary" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["include"]))')" >> "$GITHUB_OUTPUT"
           printf '%s' "$matrix" | python3 -c 'import json,sys; [print(e["name"], "<-", e["version"], "|", e["tags"]) for e in json.load(sys.stdin)["include"]]' >> "$GITHUB_STEP_SUMMARY"
@@ -336,13 +343,14 @@ jobs:
           VER: ${{ matrix.version }}
           PROFILE: ${{ matrix.profile }}
           BASE: ${{ matrix.os }}
+          PATCHES: ${{ matrix.patches }}
         run: |
           repo="https://github.com/swarm-routing/sim-containers"
           {
             echo "list<<EOF_ANNOTATIONS"
             for level in index manifest; do
-              echo "${level}:org.opencontainers.image.title=ns3-dev ${VER} ${PROFILE} (${BASE})"
-              echo "${level}:org.opencontainers.image.description=ns-3 ${VER} ${PROFILE} profile on ${BASE}: a warm Ninja build for swarm-routing contrib modules"
+              echo "${level}:org.opencontainers.image.title=ns3-dev ${VER} ${PROFILE}${PATCHES:+-patched} (${BASE})"
+              echo "${level}:org.opencontainers.image.description=ns-3 ${VER} ${PROFILE} profile on ${BASE}${PATCHES:+, patched (${PATCHES})}: a warm Ninja build for swarm-routing contrib modules"
               echo "${level}:org.opencontainers.image.source=${repo}"
               echo "${level}:org.opencontainers.image.url=${repo}"
               echo "${level}:org.opencontainers.image.documentation=${repo}#which-image"
@@ -365,6 +373,8 @@ jobs:
             BASE_OS=${{ matrix.os }}
             NS3_VERSION=${{ matrix.version }}
             BUILD_PROFILE=${{ matrix.profile }}
+            NS3_PATCHES=${{ matrix.patches }}
+            SIM_TOOLS_COMMIT=${{ matrix.sim_tools_commit }}
             REVISION=${{ github.sha }}
             BUILD_RUN=${{ github.run_id }}-${{ github.run_attempt }}
             REFRESH=${{ inputs.refresh == true && github.run_id || 'none' }}
@@ -430,6 +440,9 @@ jobs:
           EXPECT_VERSION: ${{ matrix.version }}
           EXPECT_PROFILE: ${{ matrix.profile }}
           EXPECT_OS: ${{ matrix.os }}
+          EXPECT_VARIANT: ${{ matrix.variant }}
+          EXPECT_PATCHES: ${{ matrix.patches }}
+          EXPECT_SIM_TOOLS_COMMIT: ${{ matrix.sim_tools_commit }}
           EXPECT_REVISION: ${{ github.sha }}
           EXPECT_BUILD_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
           UNIT_SET: ${{ github.event_name == 'pull_request' && matrix.pr_unit_set || '' }}
@@ -572,6 +585,9 @@ jobs:
           EXPECT_VERSION: ${{ matrix.version }}
           EXPECT_PROFILE: ${{ matrix.profile }}
           EXPECT_OS: ${{ matrix.os }}
+          EXPECT_VARIANT: ${{ matrix.variant }}
+          EXPECT_PATCHES: ${{ matrix.patches }}
+          EXPECT_SIM_TOOLS_COMMIT: ${{ matrix.sim_tools_commit }}
           EXPECT_REVISION: ${{ github.sha }}
           EXPECT_BUILD_RUN: ${{ steps.pull.outputs.build_run }}
           # Pull requests only: the OS variants run the light unit group (#87),

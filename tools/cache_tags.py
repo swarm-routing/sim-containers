@@ -7,7 +7,8 @@
 
 The buildx registry cache, ghcr.io/swarm-routing/ns3-dev-cache, has one tag
 per scope, `<ver>-<base>-<profile>` (the `cache` of a tools/ns3_matrix.py
-entry, e.g. 3.49-ubuntu-debug). Only the supported release is built by the
+entry, e.g. 3.49-ubuntu-debug), with `-patched` for the patched variant
+(3.49-ubuntu-debug-patched; docs/adr/0002-patched-image-variant.md). Only the supported release is built by the
 automatic pipelines, so only its scopes have a reader: candidates-cleanup.yml
 deletes the others daily (golden rule 14, sim-containers#146; maintainer
 decision 2026-11-13). The scope an on-demand build of an older release
@@ -27,7 +28,7 @@ tags (`git ls-remote`): never typed (rule 15).
 
 What is kept, always:
   - a scope of the supported release;
-  - a tag that is not `<ver>-<base>-<profile>` with a base and profile
+  - a tag that is not `<ver>-<base>-<profile>[-patched]` with a base and profile
     ns3_matrix.py knows: kept and reported, never deleted;
   - a scope of a release newer than the supported one (the upstream tag list
     was read short): kept and reported;
@@ -53,7 +54,7 @@ import sys
 import ns3_matrix
 
 SCOPE_RE = re.compile(
-    r"(\d+)\.(\d+)-(?:%s)-(?:%s)" % ("|".join(ns3_matrix.BASES), "|".join(ns3_matrix.FULL)))
+    r"(\d+)\.(\d+)-(?:%s)-(?:%s)(?:-patched)?" % ("|".join(ns3_matrix.BASES), "|".join(ns3_matrix.FULL)))
 MINOR_RE = re.compile(r"(\d+)\.(\d+)")
 
 

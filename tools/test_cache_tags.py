@@ -67,6 +67,14 @@ class Select(unittest.TestCase):
         self.assertEqual(keep, ["3.49-ubuntu-debug"])
         self.assertEqual(newer, [])
 
+    def test_patched_scopes_follow_their_release(self):
+        # docs/adr/0002: the patched variant's scope is <ver>-<base>-<profile>-patched.
+        keep, delete, unparsed, _ = c.select(
+            ["3.49-ubuntu-debug-patched", "3.48-ubuntu-sanitized-patched", "3.49-ubuntu-debug-patchedx"], "3.49")
+        self.assertEqual((keep, delete, unparsed),
+                         (["3.49-ubuntu-debug-patched"], ["3.48-ubuntu-sanitized-patched"],
+                          ["3.49-ubuntu-debug-patchedx"]))
+
     def test_a_release_newer_than_the_supported_one_is_kept_and_reported(self):
         # A truncated upstream tag list must not make the real newest release "old".
         keep, delete, unparsed, newer = c.select(["3.50-ubuntu-debug", "3.49-ubuntu-debug", "3.9-ubuntu-debug"], "3.49")

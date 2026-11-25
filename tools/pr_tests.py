@@ -86,6 +86,7 @@ TEST_INPUTS = [
     (r"test/(profile\.sh|fixtures/profile-probe/.*)", ("profile",)),
     (r"test/(smoke\.sh|fixtures/swarm-hello/.*)", ("smoke",)),
     (r"test/(integration\.sh|fixtures/manet-canary/.*)", ("integration",)),
+    (r"test/patches\.sh", ("patches",)),
     (r"test/(unit\.sh|ns3-suites\.txt)", ("unit",)),
     (r"test/known-failures\.txt", ("integration", "unit")),
     (r"\.trivyignore", ("security",)),

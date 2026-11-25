@@ -7,6 +7,10 @@
 #       --build-arg NS3_VERSION=3.49 --build-arg BUILD_PROFILE=debug \
 #       -t ghcr.io/swarm-routing/ns3-dev:3.49-debug .
 #
+# The patched variant (docs/adr/0002-patched-image-variant.md) adds
+# --build-arg NS3_PATCHES="NS3-005" --build-arg SIM_TOOLS_COMMIT=<SHA>, both
+# from tools/ns3_matrix.py (PATCHES, SIM_TOOLS_COMMIT).
+#
 # NS3_VERSION is the upstream tag without its `ns-` prefix (3.46.1 for a patch
 # release). BASE_IMAGE/BASE_OS pick the base; the publish workflow passes them
 # from tools/ns3_matrix.py, which holds every base's digest (invariant 13).
@@ -97,6 +101,62 @@ RUN git clone --depth 1 --branch "ns-${NS3_VERSION}" \
         https://gitlab.com/nsnam/ns-3-dev.git /opt/ns-3 \
  && rm -rf /opt/ns-3/.git
 
+# The patched variant (docs/adr/0002-patched-image-variant.md; maintainer
+# decision 2026-11-25, swarm-routing/sim-tools ADR-0002, #381): NS3_PATCHES
+# names sim-tools' self-detecting ns-3 patches (ns3/patches/<ID>/apply.sh),
+# applied to the source here, before configure, so the configure line and
+# every later step are the stock ones (invariant 10). sim-tools is fetched at
+# SIM_TOOLS_COMMIT, a full SHA pinned in tools/ns3_matrix.py (invariant 13),
+# by commit, and the checkout must be exactly that commit; nothing is
+# vendored here. Each apply.sh decides from the source (applied, or skipped:
+# already patched, no bug, no module) and prints one "<ID>: ..." line; any
+# other exit fails the build (exit 1: the bug is there but the patch does
+# not fit). The patch directories go to /usr/local/share/ns3-patches/<ID>
+# (the patch, apply.sh, the reproducer: test/patches.sh proves the image
+# with them), and /opt/ns-3/.swarm-patches records what ran: the patch set,
+# the sim-tools commit, which applied, which skipped, and apply.sh's lines.
+# A stock image (NS3_PATCHES empty, the default) gets neither, and this
+# step changes nothing in it.
+ARG NS3_PATCHES=""
+ARG SIM_TOOLS_COMMIT=""
+ARG SIM_TOOLS_REPO=https://github.com/swarm-routing/sim-tools
+# ${NS3_PATCHES} is unquoted on purpose in the loop: one word per patch ID.
+# hadolint ignore=SC2086
+RUN if [ -z "${NS3_PATCHES}" ]; then \
+        [ -z "${SIM_TOOLS_COMMIT}" ] || { echo "SIM_TOOLS_COMMIT without NS3_PATCHES" >&2; exit 1; }; \
+        echo "stock ns-3: no patch"; exit 0; \
+    fi \
+ && case "${SIM_TOOLS_COMMIT}" in *[!0-9a-f]*) false ;; *) [ "${#SIM_TOOLS_COMMIT}" -eq 40 ] ;; esac \
+        || { echo "SIM_TOOLS_COMMIT='${SIM_TOOLS_COMMIT}' is not a full commit SHA" >&2; exit 1; } \
+ && st=$(mktemp -d) \
+ && git -C "$st" init -q \
+ && git -C "$st" fetch -q --depth 1 "${SIM_TOOLS_REPO}" "${SIM_TOOLS_COMMIT}" \
+ && git -C "$st" checkout -q --detach FETCH_HEAD \
+ && got=$(git -C "$st" rev-parse HEAD) \
+ && { [ "$got" = "${SIM_TOOLS_COMMIT}" ] \
+        || { echo "sim-tools checkout is $got, pinned ${SIM_TOOLS_COMMIT}" >&2; exit 1; }; } \
+ && applied="" && skipped="" && log="" \
+ && for id in ${NS3_PATCHES}; do \
+        dir="/usr/local/share/ns3-patches/${id}" \
+     && { [ -f "$st/ns3/patches/${id}/apply.sh" ] \
+            || { echo "${id}: no ns3/patches/${id}/apply.sh in sim-tools ${SIM_TOOLS_COMMIT}" >&2; exit 1; }; } \
+     && mkdir -p "$dir" && cp -R "$st/ns3/patches/${id}/." "$dir/" \
+     && line=$(bash "$dir/apply.sh" /opt/ns-3) \
+     && echo "$line" \
+     && case "$line" in \
+            *" applied") applied="${applied:+$applied }${id}" ;; \
+            *": skipped") skipped="${skipped:+$skipped }${id}" ;; \
+            *) echo "${id}: apply.sh said neither applied nor skipped: $line" >&2; exit 1 ;; \
+        esac \
+     && log="${log}# ${line}\n" \
+     || exit 1; \
+    done \
+ && rm -rf "$st" \
+ && printf 'NS3_PATCHES="%s"\nSIM_TOOLS_REPO="%s"\nSIM_TOOLS_COMMIT="%s"\nNS3_PATCHES_APPLIED="%s"\nNS3_PATCHES_SKIPPED="%s"\n%b' \
+        "${NS3_PATCHES}" "${SIM_TOOLS_REPO}" "${SIM_TOOLS_COMMIT}" "${applied}" "${skipped}" "${log}" \
+        > /opt/ns-3/.swarm-patches \
+ && cat /opt/ns-3/.swarm-patches
+
 WORKDIR /opt/ns-3
 
 # ${flags} is unquoted on purpose: it holds one or two configure options
@@ -186,7 +246,9 @@ ARG BUILD_RUN=local
 # same keys go on the image index as annotations at build time
 # (publish-images.yml), so the registry's package page shows them and the
 # promoted tags, a carbon copy of the tested digest, carry them (test/run.sh
-# `labels` checks both).
+# `labels` checks both). A patched image (NS3_PATCHES set) says so in its
+# title and description, and every image names its patch set and the
+# sim-tools commit it came from (`none` on a stock image; docs/adr/0002).
 LABEL org.opencontainers.image.source="https://github.com/swarm-routing/sim-containers" \
       org.opencontainers.image.url="https://github.com/swarm-routing/sim-containers" \
       org.opencontainers.image.documentation="https://github.com/swarm-routing/sim-containers#which-image" \
@@ -196,8 +258,10 @@ LABEL org.opencontainers.image.source="https://github.com/swarm-routing/sim-cont
       org.opencontainers.image.version="${NS3_VERSION}" \
       io.github.swarm-routing.ns3.profile="${BUILD_PROFILE}" \
       io.github.swarm-routing.ns3.base="${BASE_OS}" \
-      org.opencontainers.image.title="ns3-dev ${NS3_VERSION} ${BUILD_PROFILE} (${BASE_OS})" \
-      org.opencontainers.image.description="ns-3 ${NS3_VERSION} ${BUILD_PROFILE} profile on ${BASE_OS}: a warm Ninja build for swarm-routing contrib modules" \
+      io.github.swarm-routing.ns3.patches="${NS3_PATCHES:-none}" \
+      io.github.swarm-routing.sim-tools.commit="${SIM_TOOLS_COMMIT:-none}" \
+      org.opencontainers.image.title="ns3-dev ${NS3_VERSION} ${BUILD_PROFILE}${NS3_PATCHES:+-patched} (${BASE_OS})" \
+      org.opencontainers.image.description="ns-3 ${NS3_VERSION} ${BUILD_PROFILE} profile on ${BASE_OS}${NS3_PATCHES:+, patched (${NS3_PATCHES})}: a warm Ninja build for swarm-routing contrib modules" \
       org.opencontainers.image.licenses="GPL-2.0-only"
 
 WORKDIR /opt/ns-3

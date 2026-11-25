@@ -70,7 +70,7 @@ slim, Alpine); the README's "Building the images" lists the arguments.
 | What | Command | CI |
 | --- | --- | --- |
 | the tools' unit tests | `python3 -m unittest discover -s tools` | `resolve the ns-3 release(s)` (`publish-images.yml`) |
-| every test stage on one image (labels, security, structure, profile, smoke, integration, unit) | `EXPECT_VERSION=3.48 EXPECT_PROFILE=debug EXPECT_OS=ubuntu test/run.sh ns3-dev:3.48-debug` | `test <image>` jobs, then `images gate` |
+| every test stage on one image (labels, security, structure, profile, smoke, integration, patches, unit) | `EXPECT_VERSION=3.48 EXPECT_PROFILE=debug EXPECT_OS=ubuntu EXPECT_VARIANT=stock test/run.sh ns3-dev:3.48-debug` | `test <image>` jobs, then `images gate` |
 | one or more stages | `test/run.sh --stages structure,smoke <image>` | same |
 | the tools' tests, a build and every stage | `make test` | |
 | the downstream list parses | `ORG_TOOLS_DIR=../.github test/downstream.sh --check` | `downstream canary` |

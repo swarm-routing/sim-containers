@@ -218,8 +218,10 @@ class Canary(unittest.TestCase):
         self.assertEqual(pt.canary(self.canaries(), tests), self.canaries())
 
     def test_one_part_of_a_split_image_is_enough(self):
-        tests = [t for t in m.test_matrix(images()) if t["name"] == "3.49-debug"][:1]
-        self.assertEqual([e["name"] for e in pt.canary(self.canaries(), tests)], ["3.49-debug"])
+        sanitized = [e for e in images() if e["profile"] == "sanitized"]
+        parts = [t for t in m.test_matrix(sanitized)]
+        self.assertGreater(len(parts), 1)  # a genuinely split image: base + unit
+        self.assertEqual([e["name"] for e in pt.canary(sanitized, parts[:1])], ["3.49-sanitized"])
 
     def test_other_images_tests_do_not_count(self):
         tests = [t for t in m.test_matrix(images()) if t["name"] == "3.49-sanitized"]

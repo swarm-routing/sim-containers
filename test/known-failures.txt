@@ -1,4 +1,4 @@
-# Known upstream failures the integration stage expects (ns3-containers#42).
+# Known upstream failures the integration stage expects (sim-containers#42).
 #
 #   <exact NS3_VERSION> <check name> <tracking issue> <expected outcome>
 #
@@ -21,7 +21,7 @@
 # (docs/ns3-rcapa/): name its NS3-NNN in a comment line above the entry.
 # NS3-001: ns-3.49 AODV ICMP livelock (swarm-routing/ns3-tools docs/ns3-bugs.md,
 # docs/ns3-rcapa/ns3-rcapa-aodv-icmp-livelock.md)
-3.49 sparse-aodv ns3-containers#35 timeout
+3.49 sparse-aodv sim-containers#35 timeout
 # ns-3.48 test bug, fixed in ns-3.49: the wifi tests match frames by packet
 # UID, which needs packet metadata on; 3.48 turns it on only through the
 # `test` module's ns3tcp suites, which the images leave out (sim-containers#49).

@@ -12,7 +12,7 @@ name: Publish images
 # `versions` input (Ubuntu x default, debug); its images are history and no
 # automatic pipeline rebuilds them.
 #
-# Build once, test by digest, promote by retagging (ns3-containers#37):
+# Build once, test by digest, promote by retagging (sim-containers#37):
 #
 #   build    each image is built ONCE and pushed to the candidate package
 #            ns3-dev-ci (never pulled by consumers); its digest is recorded
@@ -28,14 +28,14 @@ name: Publish images
 #            non-blocking Trivy CVE report of that digest goes to code scanning
 #   canary   the org's ns-3 modules (test/downstream.txt) are built and
 #            tested on the ubuntu debug candidate by test/downstream.sh, in
-#            parallel with promote (ns3-containers#44); a failing consumer
+#            parallel with promote (sim-containers#44); a failing consumer
 #            opens or updates an issue here
 #   latest   the latest-* tags move last, only when every required image of
 #            the run passed and every downstream canary passed (Alpine is
 #            experimental: it never blocks)
 #
 # Automatic and on-demand builds go through the same jobs and the same tests
-# (ns3-containers#36). Two exceptions, on pull requests only: the Debian,
+# (sim-containers#36). Two exceptions, on pull requests only: the Debian,
 # slim and Alpine images run the `light` unit group (UNIT_SET, from the
 # matrix entry's pr_unit_set; #87), Ubuntu debug and sanitized keep `full`;
 # and every image leaves out the suites on test/ns3-suites.txt's `main-only`
@@ -301,7 +301,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     # Alpine (musl) is outside ns-3's supported platforms: its failure is
-    # reported but never fails the run (ns3-containers#8).
+    # reported but never fails the run (sim-containers#8).
     continue-on-error: ${{ matrix.experimental }}
     permissions:
       contents: read

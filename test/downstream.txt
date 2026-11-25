@@ -1,5 +1,5 @@
 # The org's ns-3 contrib modules the downstream canary builds and tests on a
-# new image before `latest-*` moves (test/downstream.sh, ns3-containers#44).
+# new image before `latest-*` moves (test/downstream.sh, sim-containers#44).
 # One consumer per line, columns separated by `|`:
 #
 #   name | owner/repo@ref | ns-3 | modules | suites | stage | run
@@ -26,7 +26,7 @@
 # it gets one.
 #
 # ns3-tools runs its stock-arm delivery check without `aodv`: ns-3.49's stock
-# AODV livelocks (ns3-containers#35, AntHocNet#843); put it back when a fixed
+# AODV livelocks (sim-containers#35, AntHocNet#843); put it back when a fixed
 # release is the supported one. AntHocNet ships `ci/canary.sh`: it runs this
 # line's stage, modules, suites and run, then the behaviour gates a release
 # can move (arm-delivery and its anchors, AntHocNet#1222; ~25 min).

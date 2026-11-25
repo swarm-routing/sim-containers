@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 //
 // profile-probe: one deliberate behaviour per --mode, so test/profile.sh can
-// prove each image profile does what its name says (ns3-containers#41).
+// prove each image profile does what its name says (sim-containers#41).
 //
 //   assert     NS_ASSERT(false): aborts where asserts are on (default, debug,
 //              sanitized), returns 0 where they are compiled out (optimized)

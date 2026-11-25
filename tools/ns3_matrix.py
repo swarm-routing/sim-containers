@@ -41,10 +41,10 @@ An entry's `pr_unit_set` is the unit group its tests run on a pull request:
 `light` for the Debian, slim and Alpine images (they differ from Ubuntu's
 only in the base OS; Ubuntu's debug and sanitized keep `full`), empty for
 Ubuntu (the profile's group). Pushes to main, schedule and dispatch runs
-ignore it and run every image's profile group (ns3-containers#87).
+ignore it and run every image's profile group (sim-containers#87).
 
 An entry's `test_parts` are the test jobs its image gets, all on the same
-digest in the same run (ns3-containers#86): one part running every stage,
+digest in the same run (sim-containers#86): one part running every stage,
 or, for a profile with a `split <profile> <N>` line in test/ns3-suites.txt,
 a `base` part (every stage but unit) and the unit stage as one part (N = 1)
 or N shards (`test/run.sh --stages unit --unit-shard i/N`). promote tags the
@@ -101,7 +101,7 @@ STAGES = ["labels", "security", "structure", "profile", "smoke", "integration", 
 PROFILE_GROUP = {"debug": "full", "sanitized": "full", "default": "light", "optimized": "light"}
 IMAGE = "ghcr.io/swarm-routing/ns3-dev"
 
-# Base images, pinned by digest (ns3-containers invariant 13). Bump a digest
+# Base images, pinned by digest (sim-containers invariant 13). Bump a digest
 # here; the Dockerfile only receives it as BASE_IMAGE.
 BASES = {
     "ubuntu": "ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",

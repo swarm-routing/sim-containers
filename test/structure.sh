@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Daniel Joppi (https://github.com/swarm-routing)
 # SPDX-License-Identifier: MIT OR GPL-2.0-only
 #
-# Image structure test (ns3-containers#39), run inside an ns3-dev image:
+# Image structure test (sim-containers#39), run inside an ns3-dev image:
 #
 #   docker run --rm -e EXPECT_VERSION=3.49 -e EXPECT_PROFILE=debug -e EXPECT_OS=ubuntu \
 #       -v "$PWD:/src:ro" <image> bash /src/test/structure.sh
@@ -156,7 +156,7 @@ case "${BUILD_PROFILE:-}" in
 esac
 
 if [ "${BUILD_PROFILE:-}" = debug ]; then
-    echo "structure: SonarQube scan tools (debug: unzip, curl, gpg; ns3-containers#88)"
+    echo "structure: SonarQube scan tools (debug: unzip, curl, gpg; sim-containers#88)"
     for tool in unzip curl gpg; do
         # unzip has no --version; -v prints its version and exits 0.
         if "$tool" --version >/dev/null 2>&1 || "$tool" -v >/dev/null 2>&1; then

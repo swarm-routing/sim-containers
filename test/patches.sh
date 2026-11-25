@@ -8,9 +8,10 @@
 #   docker run --rm -v "$PWD:/src:ro" ghcr.io/swarm-routing/ns3-dev:latest-sanitized-patched \
 #       bash /src/test/patches.sh
 #
-# A stock image carries no patch: no /opt/ns-3/.swarm-patches, no
-# /usr/local/share/ns3-patches, and none of a known patch's added code in the
-# tree (NS3-005's saturation line in aodv-rtable.h).
+# A stock image carries no patch: no /opt/ns-3/.swarm-patches and no
+# /usr/local/share/ns3-patches (the build's patch step ran with no patch). It
+# also reports whether the tree has NS3-005's saturation line, as a note, not
+# a failure: an upstream release that adopts the fix must still promote.
 #
 # A patched image proves its record and every patch in it:
 #   1. /opt/ns-3/.swarm-patches names the patch set (= EXPECT_PATCHES when
@@ -52,10 +53,16 @@ if [[ "$expect" == stock ]]; then
     echo "patches: a stock image carries no patch"
     [[ ! -e "$record" ]] && ok "no $record" || bad "$record exists on a stock image"
     [[ ! -e "$share" ]] && ok "no $share" || bad "$share exists on a stock image"
+    # Informational, never a failure: a later upstream release may carry the
+    # same fix (once upstreamed), and its stock image must still promote. The
+    # two checks above are what prove that the build applied no patch.
     h="$NS3/src/aodv/model/aodv-rtable.h"
     if [[ -f "$h" ]]; then
-        ! grep -qF 'lt < maxTime - Simulator::Now()' "$h" && ok "no NS3-005 code in $h" \
-            || bad "$h has NS3-005's saturation line"
+        if grep -qF 'lt < maxTime - Simulator::Now()' "$h"; then
+            echo "  SKIP  $h has NS3-005's saturation line: this ns-3 release carries it upstream (no patch was applied)"
+        else
+            ok "no NS3-005 code in $h (upstream AODV as released)"
+        fi
     else
         echo "  SKIP  no $h (no AODV in this tree)"
     fi

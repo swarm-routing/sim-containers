@@ -459,6 +459,8 @@ jobs:
     outputs:
       tests: ${{ steps.s.outputs.tests }}
       count: ${{ steps.s.outputs.count }}
+      canary: ${{ steps.s.outputs.canary }}
+      canary_count: ${{ steps.s.outputs.canary_count }}
     steps:
       - name: Harden the runner (audit egress)
         uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
@@ -488,6 +490,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           MATRIX: ${{ needs.resolve.outputs.matrix }}
           RESOLVED: ${{ needs.resolve.outputs.tests }}
+          CANARY: ${{ needs.resolve.outputs.canary }}
         run: |
           if [ "$EVENT" = pull_request ]; then
             mkdir -p inspect
@@ -505,8 +508,12 @@ jobs:
             echo "every test job of every image (${EVENT})" >> "$GITHUB_STEP_SUMMARY"
           fi
           count=$(printf '%s' "$tests" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["include"]))')
-          { echo "tests=$tests"; echo "count=$count"; } >> "$GITHUB_OUTPUT"
-          echo "${count} test job(s)" >> "$GITHUB_STEP_SUMMARY"
+          # The canary downloads its image's pass markers, which only a test
+          # job leaves: an image select skipped gets no canary leg (#161).
+          canary=$(python3 tools/pr_tests.py canary --canary "$CANARY" --tests "$tests")
+          canary_count=$(printf '%s' "$canary" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["include"]))')
+          { echo "tests=$tests"; echo "count=$count"; echo "canary=$canary"; echo "canary_count=$canary_count"; } >> "$GITHUB_OUTPUT"
+          echo "${count} test job(s), ${canary_count} downstream canary leg(s) (an image whose tests were skipped has no pass marker to canary: unchanged digest, already tested on main)" >> "$GITHUB_STEP_SUMMARY"
 
   test:
     name: test ${{ matrix.test_name }}
@@ -797,10 +804,12 @@ jobs:
 
   canary:
     name: downstream canary ${{ matrix.name }}
-    needs: [resolve, test]
+    needs: [resolve, select, test]
     # On the tested candidate, in parallel with promote. Fork PRs have no
-    # candidate; on any PR the result is advisory (see the header).
-    if: ${{ !cancelled() && needs.resolve.outputs.canary_count != '0' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    # candidate; on any PR the result is advisory (see the header). Only an
+    # image whose test jobs ran has a pass marker: select's canary matrix
+    # leaves out the others (#161).
+    if: ${{ !cancelled() && needs.select.result == 'success' && needs.select.outputs.canary_count != '0' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     continue-on-error: ${{ github.event_name == 'pull_request' }}
@@ -810,7 +819,7 @@ jobs:
       issues: write        # report a failing consumer
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.resolve.outputs.canary) }}
+      matrix: ${{ fromJSON(needs.select.outputs.canary) }}
     steps:
       - name: Harden the runner (audit egress)
         uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0

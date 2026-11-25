@@ -26,9 +26,8 @@
 #
 # A module's name is its directory's basename, and must match the `LIBNAME` of
 # its `build_lib()` call (e.g. swarm-core/ -> libns3.49-swarm-core). List
-# dependencies first: `ns3-build-contrib /src/ns3-swarm-core /src/ARA/ns3`
-# only works if the second directory is named for its module, so mount or
-# check out as `.../ara`, or pass `name=dir` (e.g. `ara=/src/ARA/ns3`).
+# dependencies first, and pass `name=dir` when the directory is not named for
+# its module: `ns3-build-contrib swarm-core=/src/swarm-adapter-ns3 ara=/src/ARA/ns3`.
 #
 # Why this is fast: the image's tree was configured with the identical profile
 # flags, module list and --enable-tests/--enable-examples, so the only thing

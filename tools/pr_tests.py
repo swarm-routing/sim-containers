@@ -6,6 +6,7 @@
     tools/pr_tests.py refs --matrix JSON --digests DIR --candidate REF --image REF
     tools/pr_tests.py select --matrix JSON --inspect DIR [--summary FILE]
     tools/pr_tests.py decide --entry JSON --candidate FILE --reference FILE
+    tools/pr_tests.py canary --canary JSON --tests JSON
 
 On a pull request, publish-images.yml builds every image (mostly buildx cache
 hits) and then asks, per image, whether its tests can tell anything new:
@@ -46,6 +47,14 @@ candidate line. `select` reads those files and prints the test job matrix,
 one summary line per image. `decide` is the same decision for one image (a
 fork PR, whose build job tests in place): it prints {"run": bool, "stages":
 "a,b" (empty: every stage), "reason": "..."}.
+
+`canary` prints the downstream canary's matrix cut to the images `select`
+chose to test: a canary leg downloads its image's pass markers, which only
+a test job leaves, so an image whose tests were skipped ("unchanged digest,
+already tested on main") has none and its leg would fail for the missing
+marker (#161). An image that was tested keeps its leg, so a marker lost
+after a test still fails there. Without a pull request `select` passes every
+image, and the matrix comes out whole.
 """
 
 from __future__ import annotations
@@ -235,6 +244,12 @@ def select(images, inspect_dir, changed=None):
     return ns3_matrix.test_matrix(chosen), lines
 
 
+def canary(matrix, tests):
+    """The canary matrix entries whose image has a test job in `tests` (select's matrix)."""
+    tested = {t["name"] for t in tests}
+    return [e for e in matrix if e["name"] in tested]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -251,6 +266,9 @@ def main(argv=None):
     d.add_argument("--entry", required=True)
     d.add_argument("--candidate", required=True)
     d.add_argument("--reference", required=True)
+    c = sub.add_parser("canary")
+    c.add_argument("--canary", required=True)
+    c.add_argument("--tests", required=True)
     a = ap.parse_args(argv)
 
     if a.cmd == "refs":
@@ -261,6 +279,10 @@ def main(argv=None):
             f.write("### Tests this pull request needs (tools/pr_tests.py)\n\n"
                     "| Image | Tests | Why |\n|---|---|---|\n" + "\n".join(lines) + "\n")
         json.dump({"include": tests}, sys.stdout, separators=(",", ":"))
+        print()
+    elif a.cmd == "canary":
+        json.dump({"include": canary(json.loads(a.canary)["include"], json.loads(a.tests)["include"])},
+                  sys.stdout, separators=(",", ":"))
         print()
     else:
         entry = json.loads(a.entry)

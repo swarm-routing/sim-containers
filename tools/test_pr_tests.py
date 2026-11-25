@@ -202,6 +202,49 @@ class Select(unittest.TestCase):
         self.assertEqual(pt.refs(images()[:2], self.dir, "c", "i")[0].split()[1], "reference")
 
 
+class Canary(unittest.TestCase):
+    """#161: a canary leg exists only for an image whose test jobs ran."""
+
+    def canaries(self):
+        return [e for e in images() if e["os"] == "ubuntu" and e["profile"] == "debug"]
+
+    def test_skipped_image_has_no_canary_leg(self):
+        # select chose no test job (unchanged digest): no pass marker will exist.
+        self.assertEqual(pt.canary(self.canaries(), []), [])
+
+    def test_tested_image_keeps_its_leg(self):
+        # A tested image keeps its leg, so a marker missing after the test still fails there.
+        tests = m.test_matrix(images())
+        self.assertEqual(pt.canary(self.canaries(), tests), self.canaries())
+
+    def test_one_part_of_a_split_image_is_enough(self):
+        sanitized = [e for e in images() if e["profile"] == "sanitized"]
+        parts = [t for t in m.test_matrix(sanitized)]
+        self.assertGreater(len(parts), 1)  # a genuinely split image: base + unit
+        self.assertEqual([e["name"] for e in pt.canary(sanitized, parts[:1])], ["3.49-sanitized"])
+
+    def test_other_images_tests_do_not_count(self):
+        tests = [t for t in m.test_matrix(images()) if t["name"] == "3.49-sanitized"]
+        self.assertEqual(pt.canary(self.canaries(), tests), [])
+
+    def test_workflow_takes_the_canary_matrix_from_select(self):
+        # The wiring #161 needs: the canary job's matrix and condition come from select.
+        wf = os.path.join(os.path.dirname(__file__), "..", ".github", "workflows", "publish-images.yml")
+        with open(wf) as f:
+            text = f.read()
+        job = text.split("\n  canary:\n", 1)[1].split("\n  latest:\n", 1)[0]
+        self.assertIn("fromJSON(needs.select.outputs.canary)", job)
+        self.assertIn("needs.select.outputs.canary_count != '0'", job)
+        self.assertNotIn("needs.resolve.outputs.canary", job)
+
+    def test_cli(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            pt.main(["canary", "--canary", json.dumps({"include": self.canaries()}),
+                     "--tests", json.dumps({"include": []})])
+        self.assertEqual(json.loads(buf.getvalue()), {"include": []})
+
+
 class Decide(unittest.TestCase):
     def run_decide(self, e, cand, ref):
         with tempfile.TemporaryDirectory() as d:

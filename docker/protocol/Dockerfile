@@ -6,7 +6,8 @@
 # built in its warm tree, so a protocol repository's CI compiles only its own
 # module:
 #
-#   swarm-core     swarm-routing/swarm-adapter-ns3 (the module at its root)
+#   swarm-core     swarm-routing/swarm-adapter-ns3 (the module at its root), on
+#                  the swarm-routing/swarm-core release its swarm-core.lock names
 #   routing-bench  swarm-routing/sim-tools, ns3/routing-bench
 #
 # Built by publish-protocol-images.yml from what tools/protocol_images.py
@@ -18,6 +19,7 @@
 #       --build-arg BASE_IMAGE=ghcr.io/swarm-routing/ns3-dev@sha256:... \
 #       --build-arg SWARM_CORE_SPEC=swarm-routing/swarm-adapter-ns3@v2.0.0 \
 #       --build-arg SWARM_CORE_COMMIT=73f8f0de8417c05f97ae9903953e0825202c1f58 \
+#       --build-arg 'SWARM_CORE_LOCK=swarm-routing/swarm-core@v2.0.0 5fb7c180ea3a88a71b99b7c3d11dc8e2eeccb7d4' \
 #       --build-arg ROUTING_BENCH_SPEC=swarm-routing/sim-tools@v1.1.3:ns3/routing-bench \
 #       --build-arg ROUTING_BENCH_COMMIT=c3e88640469acffb1cc6cccc2da4edb1641d687b \
 #       -t ns3-protocol-dev:debug .
@@ -41,12 +43,16 @@ ARG SWARM_CORE_SPEC
 ARG SWARM_CORE_COMMIT
 ARG ROUTING_BENCH_SPEC
 ARG ROUTING_BENCH_COMMIT
+# The swarm-core release the module swarm-core (swarm-adapter-ns3) locks, as
+# the resolver read it from that release's swarm-core.lock: owner/repo@tag commit.
+ARG SWARM_CORE_LOCK
 
 # Each module is cloned at its tag, checked against the commit resolved with
 # it (a moved tag fails the build), and kept without its .git. swarm-core's
 # configure fetches the swarm-core primitives' release tarball its own
 # swarm-core.lock names, checked by SHA256 there; it stays in the CMake cache,
-# so a consumer's configure fetches nothing.
+# so a consumer's configure fetches nothing. That lock must be the one the
+# resolver read (SWARM_CORE_LOCK), recorded below.
 # ${specs} is unquoted on purpose: two specs, two words.
 # hadolint ignore=SC2086
 RUN set -eu; \
@@ -66,6 +72,10 @@ RUN set -eu; \
     }; \
     fetch swarm-core "${SWARM_CORE_SPEC}" "${SWARM_CORE_COMMIT}"; \
     fetch routing-bench "${ROUTING_BENCH_SPEC}" "${ROUTING_BENCH_COMMIT}"; \
+    lockv() { sed -n "s/^SWARM_CORE_$1=//p" /opt/swarm-modules/swarm-core/swarm-core.lock; }; \
+    lock="$(lockv REPO)@$(lockv TAG) $(lockv COMMIT)"; \
+    [ "$lock" = "${SWARM_CORE_LOCK}" ] \
+        || { echo "swarm-core: its swarm-core.lock names '$lock', expected '${SWARM_CORE_LOCK}'" >&2; exit 1; }; \
     specs="swarm-core=/opt/swarm-modules/swarm-core routing-bench=/opt/swarm-modules/routing-bench"; \
     { echo "# Modules built into this tree (docker/protocol/Dockerfile). Pass"; \
       echo "# SWARM_MODULE_SPECS to ns3-build-contrib before your own module."; \
@@ -73,6 +83,8 @@ RUN set -eu; \
       echo "SWARM_MODULES=\"swarm-core routing-bench\""; \
       echo "SWARM_MODULE_SPECS=\"${specs}\""; \
       printf 'SWARM_PREBUILT="%s"\n' "$(cat /tmp/prebuilt)"; \
+      echo "# SWARM_CORE_LOCK: the swarm-core release swarm-core (swarm-adapter-ns3) builds on, owner/repo@tag commit."; \
+      echo "SWARM_CORE_LOCK=\"${SWARM_CORE_LOCK}\""; \
       echo "SWARM_BASE_IMAGE=\"${BASE_IMAGE}\""; \
     } > /opt/ns-3/.swarm-modules.env; \
     rm /tmp/prebuilt; \
@@ -85,7 +97,11 @@ ARG BUILD_RUN=local
 # What tools/protocol_images.py compares to decide whether an image is up to
 # date: the base digest, the modules' commits and this file's hash.
 ARG RECIPE=unknown
+# The release of swarm-routing/swarm-adapter-ns3 (the module swarm-core), and
+# the swarm-core release its swarm-core.lock names (SWARM_CORE_LOCK's).
+ARG SWARM_ADAPTER_VERSION
 ARG SWARM_CORE_VERSION
+ARG SWARM_CORE_COMMIT_LOCKED
 ARG ROUTING_BENCH_VERSION
 # name=owner/repo@<40-char commit>[:subdir],... (reusable-ns3-image.yml's form)
 ARG DEPENDENCIES
@@ -95,11 +111,13 @@ LABEL org.opencontainers.image.source="https://github.com/swarm-routing/sim-cont
       org.opencontainers.image.revision="${REVISION}" \
       io.github.swarm-routing.build-run="${BUILD_RUN}" \
       org.opencontainers.image.title="ns3-protocol-dev" \
-      org.opencontainers.image.description="ns3-dev with swarm-core ${SWARM_CORE_VERSION} and routing-bench ${ROUTING_BENCH_VERSION} prebuilt: protocol CI compiles only its own module" \
+      org.opencontainers.image.description="ns3-dev with swarm-core (swarm-adapter-ns3 ${SWARM_ADAPTER_VERSION}, on swarm-core ${SWARM_CORE_VERSION}) and routing-bench ${ROUTING_BENCH_VERSION} prebuilt: protocol CI compiles only its own module" \
       io.github.swarm-routing.ns3-dev.image="${BASE_IMAGE}" \
       io.github.swarm-routing.modules="swarm-core,routing-bench" \
       io.github.swarm-routing.dependencies="${DEPENDENCIES}" \
+      io.github.swarm-routing.swarm-adapter-ns3.version="${SWARM_ADAPTER_VERSION}" \
       io.github.swarm-routing.swarm-core.version="${SWARM_CORE_VERSION}" \
+      io.github.swarm-routing.swarm-core.commit="${SWARM_CORE_COMMIT_LOCKED}" \
       io.github.swarm-routing.routing-bench.version="${ROUTING_BENCH_VERSION}" \
       io.github.swarm-routing.protocol-image.recipe="${RECIPE}"
 

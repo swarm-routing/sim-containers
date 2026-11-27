@@ -29,12 +29,28 @@ ADAPTER = [
     "73f8f0de8417c05f97ae9903953e0825202c1f58\trefs/tags/v2.0.0^{}",
     "3333333333333333333333333333333333333333\trefs/tags/v0.10.0",
 ]
+# A swarm-core.lock (swarm-adapter-ns3 v2.2.0's), served for the adapter's
+# v2.0.0 commit: a swarm-core release other than the adapter's, so a test
+# catches one version taken for the other.
+LOCK = """# The swarm-core release this ns-3 module builds on (#231).
+SWARM_CORE_REPO=swarm-routing/swarm-core
+SWARM_CORE_TAG=v2.1.0
+SWARM_CORE_COMMIT=392e84d98cefd45db184d0788c264621f2e58192
+SWARM_CORE_VERSION=2.1.0
+SWARM_CORE_ASSET=swarm-core-2.1.0.tar.gz
+SWARM_CORE_SHA256=771e815865ea4d7618cdda61f0c51d0ad52918a4a58494c83350a0576acc6138
+"""
 BASE_DIGEST = "sha256:" + "a" * 64
 SHA = "d11c6c5" + "0" * 33
 
 
 def fake_ls(repo):
     return {"swarm-routing/sim-tools": SIM_TOOLS, "swarm-routing/swarm-adapter-ns3": ADAPTER}[repo]
+
+
+def fake_lock(repo, commit):
+    assert (repo, commit) == ("swarm-routing/swarm-adapter-ns3", "73f8f0de8417c05f97ae9903953e0825202c1f58")
+    return LOCK
 
 
 def fake_inspect(published=None):
@@ -50,7 +66,7 @@ def fake_inspect(published=None):
 def run(argv, insp):
     out, err = io.StringIO(), io.StringIO()
     with redirect_stdout(out), redirect_stderr(err):
-        p.main(argv, ls=fake_ls, insp=insp)
+        p.main(argv, ls=fake_ls, insp=insp, lock_of=fake_lock)
     return json.loads(out.getvalue())["include"], err.getvalue()
 
 
@@ -71,16 +87,34 @@ class NewestRelease(unittest.TestCase):
             p.newest_release(["a\trefs/tags/latest", "b\trefs/tags/v1.0.0-rc1"])
 
 
+class Lock(unittest.TestCase):
+    def test_reads_the_release(self):
+        self.assertEqual(p.parse_lock(LOCK), {"repo": "swarm-routing/swarm-core", "tag": "v2.1.0",
+                                              "commit": "392e84d98cefd45db184d0788c264621f2e58192", "version": "2.1.0"})
+
+    def test_rejects_an_incomplete_or_inconsistent_lock(self):
+        for bad in ("", LOCK.replace("SWARM_CORE_VERSION=2.1.0", "SWARM_CORE_VERSION=2.1.1"),
+                    LOCK.replace("SWARM_CORE_TAG=v2.1.0", "SWARM_CORE_TAG=main"),
+                    LOCK.replace("392e84d98cefd45db184d0788c264621f2e58192", "392e84d")):
+            with self.subTest(bad=bad[-80:]), self.assertRaises(ValueError):
+                p.parse_lock(bad)
+
+
 class Matrix(unittest.TestCase):
     def test_nothing_published_builds_both(self):
         inc, err = run(["--sha", SHA], fake_inspect())
         self.assertEqual([e["profile"] for e in inc], ["debug", "sanitized"])
         e = inc[0]
-        self.assertEqual(e["versioned"], "3.49-debug-swarmcore2.0.0-routingbench1.1.3")
+        self.assertEqual(e["versioned"], "3.49-debug-adapter2.0.0-swarmcore2.1.0-routingbench1.1.3")
         self.assertEqual(e["tags"].split(), [
-            "3.49-debug-swarmcore2.0.0-routingbench1.1.3",
-            "3.49-debug-swarmcore2.0.0-routingbench1.1.3-d11c6c5",
+            "3.49-debug-adapter2.0.0-swarmcore2.1.0-routingbench1.1.3",
+            "3.49-debug-adapter2.0.0-swarmcore2.1.0-routingbench1.1.3-d11c6c5",
+            "3.49-debug-swarmcore2.0.0-routingbench1.1.3",  # the former name (adapter version), still moved
             "3.49-debug", "latest-debug"])
+        self.assertEqual(e["core_lock"], "swarm-routing/swarm-core@v2.1.0 392e84d98cefd45db184d0788c264621f2e58192")
+        self.assertEqual(e["core_version"], "2.1.0")
+        self.assertEqual(e["core_commit"], "392e84d98cefd45db184d0788c264621f2e58192")
+        self.assertEqual(e["swarm_core_version"], "2.0.0")  # the adapter's release
         self.assertEqual(e["base_image"], f"{p.BASE}@{BASE_DIGEST}")
         self.assertEqual(e["base_ref"], f"{p.BASE}:latest-debug")
         self.assertEqual(e["swarm_core_spec"], "swarm-routing/swarm-adapter-ns3@v2.0.0")
@@ -96,7 +130,7 @@ class Matrix(unittest.TestCase):
         e = inc[0]
         labels = {p.LABEL_BASE: e["base_image"], p.LABEL_DEPS: e["dependencies"], p.LABEL_RECIPE: e["recipe"]}
         same = ("sha256:" + "b" * 64, labels)
-        insp = fake_inspect({f"{p.IMAGE}:{t}": same for t in (e["versioned"], "3.49-debug", "latest-debug")})
+        insp = fake_inspect({f"{p.IMAGE}:{t}": same for t in e["tags"].split() if not t.endswith("-d11c6c5")})
         inc2, err = run(["--sha", SHA, "--profiles", "debug"], insp)
         self.assertEqual(inc2, [])
         self.assertIn("up to date", err)
@@ -109,8 +143,9 @@ class Matrix(unittest.TestCase):
         e = inc[0]
         labels = {p.LABEL_BASE: e["base_image"], p.LABEL_DEPS: e["dependencies"], p.LABEL_RECIPE: e["recipe"]}
         same = ("sha256:" + "b" * 64, labels)
-        insp = fake_inspect({f"{p.IMAGE}:{e['versioned']}": same, f"{p.IMAGE}:3.49-debug": same,
-                             f"{p.IMAGE}:latest-debug": ("sha256:" + "d" * 64, labels)})
+        published = {f"{p.IMAGE}:{t}": same for t in e["tags"].split()}
+        published[f"{p.IMAGE}:latest-debug"] = ("sha256:" + "d" * 64, labels)
+        insp = fake_inspect(published)
         inc2, err = run(["--sha", SHA, "--profiles", "debug"], insp)
         self.assertEqual(len(inc2), 1)
         self.assertIn("`latest-debug` is not on", err)
@@ -132,11 +167,11 @@ class Matrix(unittest.TestCase):
     def test_profiles_ci_consumes_only(self):
         for bad in ("optimized", "default", "debug,optimized", ""):
             with self.subTest(bad=bad), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                p.main(["--sha", SHA, "--profiles", bad], ls=fake_ls, insp=fake_inspect())
+                p.main(["--sha", SHA, "--profiles", bad], ls=fake_ls, insp=fake_inspect(), lock_of=fake_lock)
 
     def test_missing_base_fails(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-            p.main(["--sha", SHA], ls=fake_ls, insp=lambda ref: None)
+            p.main(["--sha", SHA], ls=fake_ls, insp=lambda ref: None, lock_of=fake_lock)
 
     def test_recipe_is_the_dockerfile(self):
         self.assertRegex(p.recipe(), r"^[0-9a-f]{16}$")

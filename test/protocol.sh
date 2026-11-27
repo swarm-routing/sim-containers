@@ -12,7 +12,9 @@
 # On a protocol image it proves the promise protocol CI relies on:
 #   1. the record: every prebuilt module (SWARM_PREBUILT) is at its path, a
 #      release tag and a 40-char commit, linked as contrib/<name> and built,
-#      and SWARM_MODULE_SPECS names exactly those paths; no stock ns-3
+#      and SWARM_MODULE_SPECS names exactly those paths; SWARM_CORE_LOCK is
+#      the swarm-core release the module swarm-core's (swarm-adapter-ns3's)
+#      swarm-core.lock names; no stock ns-3
 #      library is newer than the record (the image build compiled none);
 #   2. the prebuilt modules are what a consumer builds: ns3-build-contrib with
 #      SWARM_MODULE_SPECS alone compiles none of their objects again
@@ -48,6 +50,7 @@ names=(); specs=()
 while read -r spec commit path; do
     [[ -n "$spec" ]] || continue
     name=${spec%%=*}; names+=("$name"); specs+=("$name=$path")
+    [[ "$name" = swarm-core ]] && core_path=$path
     ref=${spec#*@}; ref=${ref%%:*}
     [[ "$ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && ok "$name: release tag $ref" || bad "$name: '$ref' is not a release tag vX.Y.Z"
     [[ "$commit" =~ ^[0-9a-f]{40}$ ]] && ok "$name: commit $commit" || bad "$name: '$commit' is not a 40-char commit"
@@ -60,6 +63,19 @@ done <<< "${SWARM_PREBUILT:-}"
 [[ "${SWARM_MODULE_SPECS:-}" = "${specs[*]}" ]] && ok "SWARM_MODULE_SPECS = ${specs[*]}" \
     || bad "SWARM_MODULE_SPECS='${SWARM_MODULE_SPECS:-}', expected '${specs[*]}'"
 [[ "${SWARM_MODULES:-}" = "${names[*]}" ]] && ok "SWARM_MODULES = ${names[*]}" || bad "SWARM_MODULES='${SWARM_MODULES:-}', expected '${names[*]}'"
+# The module swarm-core is swarm-routing/swarm-adapter-ns3; SWARM_CORE_LOCK is
+# the swarm-core release its swarm-core.lock names (owner/repo@vX.Y.Z commit).
+lockfile=${core_path:-/opt/swarm-modules/swarm-core}/swarm-core.lock
+if [[ -f "$lockfile" ]]; then
+    lockv() { sed -n "s/^SWARM_CORE_$1=//p" "$lockfile"; }
+    want="$(lockv REPO)@$(lockv TAG) $(lockv COMMIT)"
+    [[ "${SWARM_CORE_LOCK:-}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@v[0-9]+\.[0-9]+\.[0-9]+\ [0-9a-f]{40}$ ]] \
+        && ok "SWARM_CORE_LOCK = ${SWARM_CORE_LOCK}" || bad "SWARM_CORE_LOCK='${SWARM_CORE_LOCK:-}' is not owner/repo@vX.Y.Z <40-char commit>"
+    [[ "${SWARM_CORE_LOCK:-}" = "$want" ]] && ok "SWARM_CORE_LOCK is swarm-core's $lockfile" \
+        || bad "SWARM_CORE_LOCK='${SWARM_CORE_LOCK:-}', but $lockfile names '$want'"
+else
+    bad "no $lockfile: the module swarm-core (swarm-adapter-ns3) names no swarm-core release"
+fi
 
 # The image's build added the modules and touched no stock ns-3 library (all
 # older than the record, written just before the build): ns3-dev's profile,

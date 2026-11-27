@@ -139,8 +139,9 @@ tag. A protocol's CI on it compiles only the protocol module. Profiles
 |---|---|
 | `:latest-debug`, `:latest-sanitized` | the supported ns-3 release with the newest module releases |
 | `:3.49-debug` | that ns-3 release with the newest module releases |
-| `:3.49-debug-swarmcore2.0.0-routingbench1.1.3` | those exact versions (rebuilt when ns3-dev's image moves) |
+| `:3.49-debug-adapter2.2.0-swarmcore2.1.0-routingbench1.1.3` | those exact versions: swarm-adapter-ns3 2.2.0, the swarm-core release its `swarm-core.lock` names (2.1.0), routing-bench 1.1.3 (rebuilt when ns3-dev's image moves) |
 | the tag above + `-<sha7>` | immutable: the sim-containers commit that built it |
+| `:3.49-debug-swarmcore2.2.0-routingbench1.1.3` | the former name of the same image (the adapter's version under `swarmcore`), still moved with it |
 
 Use the image's paths for the prebuilt modules, listed first, and your own
 module after them; `--quality-modules` keeps the quality options off the
@@ -153,10 +154,13 @@ docker run --rm -v "$PWD:/src/ara:ro" ghcr.io/swarm-routing/ns3-protocol-dev:lat
 ```
 
 `/opt/ns-3/.swarm-modules.env` records each module (`SWARM_PREBUILT`: its
-repository, tag, commit and path), and the image labels carry the same
-(`io.github.swarm-routing.dependencies`, `.swarm-core.version`,
-`.routing-bench.version`, `.ns3-dev.image`: the ns3-dev digest it was built
-on). The org's `reusable-ns3-ci.yml` uses it with `protocol-image: true`: a
+repository, tag, commit and path) and the swarm-core release the module
+swarm-core builds on (`SWARM_CORE_LOCK`: `owner/repo@tag commit`, read from
+swarm-adapter-ns3's `swarm-core.lock` at that release), and the image labels
+carry the same (`io.github.swarm-routing.dependencies`,
+`.swarm-adapter-ns3.version`, `.swarm-core.version` and `.swarm-core.commit`:
+the locked swarm-core release, `.routing-bench.version`, `.ns3-dev.image`: the
+ns3-dev digest it was built on). The org's `reusable-ns3-ci.yml` uses it with `protocol-image: true`: a
 `dependencies` entry at the commit the image holds is used prebuilt, any other
 is built from source over it, as before. Measured on ns-3.49 with ARA
 (swarm-core v2.0.0, routing-bench v1.1.3, `--strict-warnings`, 4 cores): 67

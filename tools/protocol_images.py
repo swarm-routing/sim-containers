@@ -15,6 +15,9 @@ read, never typed (rules 13, 15):
            by digest, the ns-3 release read from its version label
   modules  each module's newest release: the highest vX.Y.Z tag of its
            repository (`git ls-remote`, no pre-release) and the commit it names
+  lock     the swarm-core release the ns-3 module swarm-core (the repository
+           swarm-routing/swarm-adapter-ns3) builds on: its swarm-core.lock at
+           that commit (the Dockerfile checks the clone's against it)
   recipe   the hash of docker/protocol/Dockerfile
 
 and the image is built only when its versioned tag does not exist yet or
@@ -23,13 +26,15 @@ was built from other inputs (the labels the Dockerfile records), or with
 refresh) or a new release of either module rebuilds it, nothing else does.
 
 Profiles: debug and sanitized only, the two CI consumes (rule 12); Ubuntu,
-the base reusable-ns3-ci.yml uses. Tags of an entry (e.g. ns-3.49, swarm-core
-2.0.0, routing-bench 1.1.3, debug):
+the base reusable-ns3-ci.yml uses. Tags of an entry (e.g. ns-3.49,
+swarm-adapter-ns3 2.2.0 locking swarm-core 2.1.0, routing-bench 1.1.3, debug):
 
-  3.49-debug-swarmcore2.0.0-routingbench1.1.3          rolling: newest build of these inputs
-  3.49-debug-swarmcore2.0.0-routingbench1.1.3-<sha7>   immutable: the sim-containers commit
-  3.49-debug                                           rolling: the newest modules on 3.49
-  latest-debug                                         rolling: the supported release (automatic builds only)
+  3.49-debug-adapter2.2.0-swarmcore2.1.0-routingbench1.1.3         rolling: newest build of these inputs
+  3.49-debug-adapter2.2.0-swarmcore2.1.0-routingbench1.1.3-<sha7>  immutable: the sim-containers commit
+  3.49-debug-swarmcore2.2.0-routingbench1.1.3   rolling: the former name (the adapter's version as
+                                                swarmcore), kept so a reference to it keeps moving
+  3.49-debug                                    rolling: the newest modules on 3.49
+  latest-debug                                  rolling: the supported release (automatic builds only)
 
 Prints {"include": [entry, ...]} with only the entries to build on stdout,
 and one Markdown list line per profile (build or skip, and why) on stderr,
@@ -43,16 +48,22 @@ import os
 import re
 import subprocess
 import sys
+import urllib.request
 
 IMAGE = "ghcr.io/swarm-routing/ns3-protocol-dev"
 BASE = "ghcr.io/swarm-routing/ns3-dev"
 PROFILES = ("debug", "sanitized")
 RECIPE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "docker", "protocol", "Dockerfile")
-# name -> (repository, subdirectory holding the module, tag stem in image tags)
+# ns-3 module name -> (repository, subdirectory holding the module, tag stem in
+# image tags). The module swarm-core is swarm-routing/swarm-adapter-ns3: its
+# stem is `adapter`; `swarmcore` in a tag is the swarm-core release it locks.
 MODULES = {
-    "swarm-core": ("swarm-routing/swarm-adapter-ns3", "", "swarmcore"),
+    "swarm-core": ("swarm-routing/swarm-adapter-ns3", "", "adapter"),
     "routing-bench": ("swarm-routing/sim-tools", "ns3/routing-bench", "routingbench"),
 }
+# The module whose swarm-core.lock names the swarm-core release it builds on,
+# and the former stem of its version in the compatibility tag.
+LOCKING, LEGACY_STEM = "swarm-core", "swarmcore"
 RELEASE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
 LABEL_RECIPE = "io.github.swarm-routing.protocol-image.recipe"
 LABEL_BASE = "io.github.swarm-routing.ns3-dev.image"
@@ -81,6 +92,23 @@ def ls_remote(repo):
     out = subprocess.run(["git", "ls-remote", "--tags", f"https://github.com/{repo}.git"],
                          check=True, capture_output=True, text=True, timeout=120).stdout
     return out.splitlines()
+
+
+def fetch_lock(repo, commit):
+    """swarm-core.lock of a repository at a commit (the one its release tag names)."""
+    url = f"https://raw.githubusercontent.com/{repo}/{commit}/swarm-core.lock"
+    with urllib.request.urlopen(url, timeout=60) as r:  # noqa: S310 (a fixed https URL)
+        return r.read().decode()
+
+
+def parse_lock(text):
+    """{repo, tag, commit, version} of the swarm-core release a swarm-core.lock names."""
+    kv = dict(line.split("=", 1) for line in text.splitlines() if re.match(r"^[A-Z0-9_]+=", line))
+    lock = {k: kv.get(f"SWARM_CORE_{k.upper()}", "") for k in ("repo", "tag", "commit", "version")}
+    if not re.fullmatch(r"[\w.-]+/[\w.-]+", lock["repo"]) or not RELEASE.match(lock["tag"]) \
+            or not re.fullmatch(r"[0-9a-f]{40}", lock["commit"]) or lock["version"] != lock["tag"][1:]:
+        raise ValueError(f"swarm-core.lock names no release owner/repo, vX.Y.Z, 40-char commit, X.Y.Z: {lock}")
+    return lock
 
 
 def inspect(ref):
@@ -115,14 +143,23 @@ def modules(releases):
     return out
 
 
-def entry(profile, ns3_version, base_ref, base_digest, ns3_release, mods, rec, sha):
-    versioned = f"{ns3_release}-{profile}-" + "-".join(f"{m['stem']}{m['version']}" for m in mods)
-    tags = [versioned, f"{versioned}-{sha[:7]}", f"{ns3_release}-{profile}"]
+def entry(profile, ns3_version, base_ref, base_digest, ns3_release, mods, lock, rec, sha):
+    def part(m, legacy=False):
+        if m["name"] != LOCKING:
+            return f"{m['stem']}{m['version']}"
+        if legacy:
+            return f"{LEGACY_STEM}{m['version']}"
+        return f"{m['stem']}{m['version']}-swarmcore{lock['version']}"
+    versioned = f"{ns3_release}-{profile}-" + "-".join(part(m) for m in mods)
+    legacy = f"{ns3_release}-{profile}-" + "-".join(part(m, legacy=True) for m in mods)
+    tags = [versioned, f"{versioned}-{sha[:7]}", legacy, f"{ns3_release}-{profile}"]
     if ns3_version == "latest":
         tags.append(f"latest-{profile}")
     e = {"profile": profile, "ns3": ns3_release, "base_ref": base_ref,
          "base_image": f"{BASE}@{base_digest}", "recipe": rec,
          "dependencies": ",".join(m["pinned"] for m in mods),
+         "core_lock": f"{lock['repo']}@{lock['tag']} {lock['commit']}",
+         "core_version": lock["version"], "core_commit": lock["commit"],
          "versioned": versioned, "tags": " ".join(tags)}
     for m in mods:
         key = m["name"].replace("-", "_")
@@ -145,7 +182,7 @@ def decide(e, existing_labels, force=False):
     return False, f"`{e['versioned']}` is up to date (same ns3-dev digest, module commits and recipe)"
 
 
-def main(argv=None, ls=ls_remote, insp=inspect):
+def main(argv=None, ls=ls_remote, insp=inspect, lock_of=fetch_lock):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--sha", required=True, help="the sim-containers commit (its sha7 is the immutable tag suffix)")
     ap.add_argument("--ns3-version", default="latest", help="latest (default) or an ns-3 release with an ns3-dev image, e.g. 3.48")
@@ -160,6 +197,8 @@ def main(argv=None, ls=ls_remote, insp=inspect):
         ap.error(f"--ns3-version takes latest or a release such as 3.48, not {a.ns3_version!r}")
 
     mods = modules({name: newest_release(ls(repo)) for name, (repo, _, _) in MODULES.items()})
+    locking = next(m for m in mods if m["name"] == LOCKING)
+    lock = parse_lock(lock_of(MODULES[LOCKING][0], locking["commit"]))
     rec = recipe()
     include, lines = [], []
     for p in profiles:
@@ -171,7 +210,7 @@ def main(argv=None, ls=ls_remote, insp=inspect):
         release = labels.get("org.opencontainers.image.version", "")
         if not release:
             raise SystemExit(f"{base_ref} has no org.opencontainers.image.version label")
-        e = entry(p, a.ns3_version, base_ref, digest, release, mods, rec, a.sha)
+        e = entry(p, a.ns3_version, base_ref, digest, release, mods, lock, rec, a.sha)
         # An unreadable tag (a package not created yet answers 403 to an
         # anonymous pull) counts as not published: the cost is one extra build,
         # and an immutable -<sha7> tag is never moved by the promote step.
@@ -194,7 +233,8 @@ def main(argv=None, ls=ls_remote, insp=inspect):
                     build, why = True, f"`{t}` is not on `{e['versioned']}`"
                     break
         lines.append(f"- {p}: {'build' if build else 'skip'}: {why}; base `{base_ref}` = `{digest[:19]}`, "
-                     + ", ".join(f"{m['name']} {m['spec']} ({m['commit'][:7]})" for m in mods))
+                     + ", ".join(f"{m['name']} {m['spec']} ({m['commit'][:7]})" for m in mods)
+                     + f", locking swarm-core {lock['repo']}@{lock['tag']} ({lock['commit'][:7]})")
         if build:
             include.append(e)
     print("\n".join(lines), file=sys.stderr)

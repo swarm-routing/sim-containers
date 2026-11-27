@@ -29,14 +29,16 @@ ADAPTER = [
     "73f8f0de8417c05f97ae9903953e0825202c1f58\trefs/tags/v2.0.0^{}",
     "3333333333333333333333333333333333333333\trefs/tags/v0.10.0",
 ]
-# swarm-adapter-ns3's swarm-core.lock at v2.0.0's commit.
+# A swarm-core.lock (swarm-adapter-ns3 v2.2.0's), served for the adapter's
+# v2.0.0 commit: a swarm-core release other than the adapter's, so a test
+# catches one version taken for the other.
 LOCK = """# The swarm-core release this ns-3 module builds on (#231).
 SWARM_CORE_REPO=swarm-routing/swarm-core
-SWARM_CORE_TAG=v2.0.0
-SWARM_CORE_COMMIT=5fb7c180ea3a88a71b99b7c3d11dc8e2eeccb7d4
-SWARM_CORE_VERSION=2.0.0
-SWARM_CORE_ASSET=swarm-core-2.0.0.tar.gz
-SWARM_CORE_SHA256=02d241f3ef02a5850ce8b38986001044bd030b7b7d9e13c1a2bf29094d4f3965
+SWARM_CORE_TAG=v2.1.0
+SWARM_CORE_COMMIT=392e84d98cefd45db184d0788c264621f2e58192
+SWARM_CORE_VERSION=2.1.0
+SWARM_CORE_ASSET=swarm-core-2.1.0.tar.gz
+SWARM_CORE_SHA256=771e815865ea4d7618cdda61f0c51d0ad52918a4a58494c83350a0576acc6138
 """
 BASE_DIGEST = "sha256:" + "a" * 64
 SHA = "d11c6c5" + "0" * 33
@@ -87,13 +89,13 @@ class NewestRelease(unittest.TestCase):
 
 class Lock(unittest.TestCase):
     def test_reads_the_release(self):
-        self.assertEqual(p.parse_lock(LOCK), {"repo": "swarm-routing/swarm-core", "tag": "v2.0.0",
-                                              "commit": "5fb7c180ea3a88a71b99b7c3d11dc8e2eeccb7d4", "version": "2.0.0"})
+        self.assertEqual(p.parse_lock(LOCK), {"repo": "swarm-routing/swarm-core", "tag": "v2.1.0",
+                                              "commit": "392e84d98cefd45db184d0788c264621f2e58192", "version": "2.1.0"})
 
     def test_rejects_an_incomplete_or_inconsistent_lock(self):
-        for bad in ("", LOCK.replace("SWARM_CORE_VERSION=2.0.0", "SWARM_CORE_VERSION=2.0.1"),
-                    LOCK.replace("SWARM_CORE_TAG=v2.0.0", "SWARM_CORE_TAG=main"),
-                    LOCK.replace("5fb7c180ea3a88a71b99b7c3d11dc8e2eeccb7d4", "5fb7c18")):
+        for bad in ("", LOCK.replace("SWARM_CORE_VERSION=2.1.0", "SWARM_CORE_VERSION=2.1.1"),
+                    LOCK.replace("SWARM_CORE_TAG=v2.1.0", "SWARM_CORE_TAG=main"),
+                    LOCK.replace("392e84d98cefd45db184d0788c264621f2e58192", "392e84d")):
             with self.subTest(bad=bad[-80:]), self.assertRaises(ValueError):
                 p.parse_lock(bad)
 
@@ -103,15 +105,15 @@ class Matrix(unittest.TestCase):
         inc, err = run(["--sha", SHA], fake_inspect())
         self.assertEqual([e["profile"] for e in inc], ["debug", "sanitized"])
         e = inc[0]
-        self.assertEqual(e["versioned"], "3.49-debug-adapter2.0.0-swarmcore2.0.0-routingbench1.1.3")
+        self.assertEqual(e["versioned"], "3.49-debug-adapter2.0.0-swarmcore2.1.0-routingbench1.1.3")
         self.assertEqual(e["tags"].split(), [
-            "3.49-debug-adapter2.0.0-swarmcore2.0.0-routingbench1.1.3",
-            "3.49-debug-adapter2.0.0-swarmcore2.0.0-routingbench1.1.3-d11c6c5",
-            "3.49-debug-swarmcore2.0.0-routingbench1.1.3",  # the former name, still moved
+            "3.49-debug-adapter2.0.0-swarmcore2.1.0-routingbench1.1.3",
+            "3.49-debug-adapter2.0.0-swarmcore2.1.0-routingbench1.1.3-d11c6c5",
+            "3.49-debug-swarmcore2.0.0-routingbench1.1.3",  # the former name (adapter version), still moved
             "3.49-debug", "latest-debug"])
-        self.assertEqual(e["core_lock"], "swarm-routing/swarm-core@v2.0.0 5fb7c180ea3a88a71b99b7c3d11dc8e2eeccb7d4")
-        self.assertEqual(e["core_version"], "2.0.0")
-        self.assertEqual(e["core_commit"], "5fb7c180ea3a88a71b99b7c3d11dc8e2eeccb7d4")
+        self.assertEqual(e["core_lock"], "swarm-routing/swarm-core@v2.1.0 392e84d98cefd45db184d0788c264621f2e58192")
+        self.assertEqual(e["core_version"], "2.1.0")
+        self.assertEqual(e["core_commit"], "392e84d98cefd45db184d0788c264621f2e58192")
         self.assertEqual(e["swarm_core_version"], "2.0.0")  # the adapter's release
         self.assertEqual(e["base_image"], f"{p.BASE}@{BASE_DIGEST}")
         self.assertEqual(e["base_ref"], f"{p.BASE}:latest-debug")

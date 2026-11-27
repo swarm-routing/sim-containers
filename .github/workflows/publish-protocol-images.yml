@@ -30,8 +30,11 @@ name: Publish protocol images
 # candidate is then deleted (a failed run leaves it for candidates-cleanup.yml,
 # 2 days). A fork PR loads the image and tests it in place.
 #
-# Tags (tools/protocol_images.py): <ns3>-<profile>-swarmcore<v>-routingbench<v>,
-# its immutable -<sha7> twin (never moved once set), <ns3>-<profile> and
+# Tags (tools/protocol_images.py):
+# <ns3>-<profile>-adapter<v>-swarmcore<v>-routingbench<v> (swarm-adapter-ns3's
+# release and the swarm-core release its swarm-core.lock names), its immutable
+# -<sha7> twin (never moved once set), the former name
+# <ns3>-<profile>-swarmcore<adapter v>-routingbench<v>, <ns3>-<profile> and
 # latest-<profile>. No buildx cache: the build is one incremental layer
 # (about a minute on debug) over the ns3-dev image it pulls.
 on:
@@ -171,7 +174,10 @@ jobs:
             BASE_IMAGE=${{ matrix.base_image }}
             SWARM_CORE_SPEC=${{ matrix.swarm_core_spec }}
             SWARM_CORE_COMMIT=${{ matrix.swarm_core_commit }}
-            SWARM_CORE_VERSION=${{ matrix.swarm_core_version }}
+            SWARM_ADAPTER_VERSION=${{ matrix.swarm_core_version }}
+            SWARM_CORE_LOCK=${{ matrix.core_lock }}
+            SWARM_CORE_VERSION=${{ matrix.core_version }}
+            SWARM_CORE_COMMIT_LOCKED=${{ matrix.core_commit }}
             ROUTING_BENCH_SPEC=${{ matrix.routing_bench_spec }}
             ROUTING_BENCH_COMMIT=${{ matrix.routing_bench_commit }}
             ROUTING_BENCH_VERSION=${{ matrix.routing_bench_version }}
@@ -212,7 +218,9 @@ jobs:
               "io.github.swarm-routing.ns3-dev.image": e["base_image"],
               "io.github.swarm-routing.dependencies": e["dependencies"],
               "io.github.swarm-routing.protocol-image.recipe": e["recipe"],
-              "io.github.swarm-routing.swarm-core.version": e["swarm_core_version"],
+              "io.github.swarm-routing.swarm-adapter-ns3.version": e["swarm_core_version"],
+              "io.github.swarm-routing.swarm-core.version": e["core_version"],
+              "io.github.swarm-routing.swarm-core.commit": e["core_commit"],
               "io.github.swarm-routing.routing-bench.version": e["routing_bench_version"],
               "io.github.swarm-routing.ns3.profile": e["profile"],
               "org.opencontainers.image.version": e["ns3"],
@@ -223,6 +231,8 @@ jobs:
               line = f"{name}={e[k + '_spec']} {e[k + '_commit']} /opt/swarm-modules/{name}"
               if not re.search('^(SWARM_PREBUILT=")?' + re.escape(line) + '"?$', env, re.M):
                   bad.append(f".swarm-modules.env has no line {line!r}")
+          if f'SWARM_CORE_LOCK="{e["core_lock"]}"' not in env:
+              bad.append(f".swarm-modules.env does not record SWARM_CORE_LOCK={e['core_lock']!r}")
           if f'SWARM_BASE_IMAGE="{e["base_image"]}"' not in env:
               bad.append(".swarm-modules.env names another base image")
           for b in bad:
@@ -259,7 +269,9 @@ jobs:
         run: |
           docker run --rm -e TRIVY_USERNAME -e TRIVY_PASSWORD "$TRIVY" image --quiet \
             --image-src remote --format cyclonedx "${CANDIDATE}@${DIGEST}" > sbom.cdx.json
-          # ns-3 and the two modules are built from source: added as components.
+          # ns-3, the two modules and the swarm-core release the module
+          # swarm-core (swarm-adapter-ns3) locks are built from source: added
+          # as components, each named by its repository.
           python3 - <<'PY'
           import json, os
           e = json.loads(os.environ["ENTRY"])
@@ -273,9 +285,15 @@ jobs:
               k = name.replace("-", "_")
               repo = e[k + "_spec"].split("@")[0]
               purl = f"pkg:github/{repo}@{e[k + '_commit']}"
-              comps.append({"type": "library", "bom-ref": purl, "name": name, "version": e[k + "_version"],
+              comps.append({"type": "library", "bom-ref": purl, "name": repo.split("/")[1], "version": e[k + "_version"],
                             "purl": purl, "licenses": [{"license": {"id": "GPL-2.0-only"}}],
-                            "properties": [{"name": "swarm-routing:path", "value": f"/opt/swarm-modules/{name}"}]})
+                            "properties": [{"name": "swarm-routing:path", "value": f"/opt/swarm-modules/{name}"},
+                                           {"name": "swarm-routing:ns3-module", "value": name}]})
+          core, core_commit = e["core_lock"].split()
+          purl = f"pkg:github/{core.split('@')[0]}@{core_commit}"
+          comps.append({"type": "library", "bom-ref": purl, "name": "swarm-core", "version": e["core_version"],
+                        "purl": purl, "licenses": [{"expression": "MIT OR GPL-2.0-only"}],
+                        "properties": [{"name": "swarm-routing:locked-by", "value": "swarm-adapter-ns3 swarm-core.lock"}]})
           json.dump(bom, open("sbom.cdx.json", "w"), indent=1)
           print(f"SBOM: {len(comps)} components")
           PY
